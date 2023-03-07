@@ -1,0 +1,44 @@
+{
+  "update_url": "https://clients2.google.com/service/update2/crx",
+  "name": "Let's Copy",
+  "version": "1.0",
+  "manifest_version": 3,
+  "description": "Allow copy in parts of websites.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "24": "icons/icon24.png",
+    "32": "icons/icon32.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+
+	"action": {
+        "default_icon": "icons/icon24-disable.png",
+        "default_title": "Let's Copy"
+	},
+
+  "host_permissions": [ "<all_urls>"],
+
+  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'self'"},
+
+  "content_scripts": [
+    {
+            "matches": ["<all_urls>"],
+            "js": ["content.js"],
+            "css":["styles.css"]
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["enable.js"],
+      "matches": ["<all_urls>"],
+      "use_dynamic_url": true
+    }
+  ]
+}

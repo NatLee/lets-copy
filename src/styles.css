@@ -1,0 +1,113 @@
+.myformgroup {
+  margin-top: -20px;
+}
+
+#upicon {
+  margin-top: -8px;
+}
+#reczoom {
+  display: inline-block;
+  text-align: center;
+  margin-left: 4px;
+  color: inherit;
+}
+
+
+#catchLater {
+  margin-left: 20px;
+  margin-bottom: 20px;
+}
+
+#rectext {
+  display: inline-block;
+  text-align: center;
+  margin-left: 8px;
+}
+#recdia {
+  display: inline-block;
+  text-align: center;
+  margin-left: 8px;
+  color: inherit;
+  margin-right: -3px;
+}
+
+#shead {
+  margin-left: 38px;
+}
+
+
+
+#warnText {
+  color: red;
+  display: inline-block;
+  text-align: center;
+  margin-left: 8px;
+}
+
+#warnunder {
+  text-decoration: underline;
+  display: inline-block;
+  text-align: center;
+  margin-left: 8px;
+
+}
+#warnMsg {
+  display: inline-block;
+  text-align: center;
+  margin-left: 8px;
+
+}
+#recordButton {
+ margin-left: 5px;
+}
+#headerSpan {
+  display: block;
+  text-align: left;
+  margin-left: 30px;
+  margin-bottom: -16px;
+}
+#recordingButton {
+  background-color: red;
+  font-style: bold;
+  position: absolute;
+  left: 40%;
+}
+#recordingInput{
+  margin-left: 58px;
+  background-color: red;
+  font-style: bold;
+}
+
+#recordImage {
+  margin-left: 20px;
+  margin-top: -8px;
+  vertical-align: middle;
+  max-width: 5% !important;
+}
+
+#iholder {
+  display: inline-block;
+  position:absolute;
+  left: 50%;
+  top: 10.9%;
+}
+
+
+#mycheckbox {
+  width: 25px;
+  height: 25px;
+   margin-left: 96px;
+   vertical-align: top;
+  margin-top: -3px;
+  /**float:right; **/
+}
+
+#mycheckboxtext {
+  margin-left: 5px;
+  /** float:right; **/
+}
+
+
+.centered-text {
+  text-align: center;
+}
