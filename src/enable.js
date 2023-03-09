@@ -1,10 +1,6 @@
-console.log('Let\'s Copy Loaded.');
+//console.log('Let\'s Copy Loaded.');
 
 (function () {
-    document.body.style.color = "purple";
-    var doc = document;
-    var body = doc.body;
-    var html = doc.documentElement;
 
     function addAllowUserSelectStyle(selection) {
         var element = document.createElement("style");
@@ -37,15 +33,9 @@ console.log('Let\'s Copy Loaded.');
         allowUserSelect(html);
         allowUserSelect(body)
     }
-    clearHandlers();
 
     function defaultHandler(event) {
         event.returnValue = true
-    }
-    for (event_type in ["selectstart", "copy", "cut", "paste", "keydown", "contextmenu", "dragstart"]) {
-        html.addEventListener(event_type, defaultHandler);
-        body.addEventListener(event_type, defaultHandler);
-        doc.addEventListener(event_type, defaultHandler)
     }
 
     function removeEventAttributes(element) {
@@ -60,18 +50,6 @@ console.log('Let\'s Copy Loaded.');
         element.removeAttribute("onclick");
         element.removeAttribute("onmousedown");
         element.removeAttribute("onmouseup")
-    }
-    var jQuery = window.jQuery;
-    var $Fn = window.$Fn;
-    if ($Fn) {
-        try {
-            $Fn.freeElement(doc);
-            $Fn.freeElement(body)
-        } catch (e) {}
-    }
-    var jindo = window.jindo;
-    if (jindo) {
-        jindo.$A = null
     }
 
     function replaceElementEventsWithClone(element) {
@@ -88,6 +66,33 @@ console.log('Let\'s Copy Loaded.');
             replaceElementEventsWithClone(elements[i])
         }
     }
+
+    document.body.style.color = "purple";
+    var doc = document;
+    var body = doc.body;
+    var html = doc.documentElement;
+
+    clearHandlers();
+
+    for (event_type in ["selectstart", "copy", "cut", "paste", "keydown", "contextmenu", "dragstart"]) {
+        html.addEventListener(event_type, defaultHandler);
+        body.addEventListener(event_type, defaultHandler);
+        doc.addEventListener(event_type, defaultHandler)
+    }
+
+    var jQuery = window.jQuery;
+    var $Fn = window.$Fn;
+    if ($Fn) {
+        try {
+            $Fn.freeElement(doc);
+            $Fn.freeElement(body)
+        } catch (e) {}
+    }
+    var jindo = window.jindo;
+    if (jindo) {
+        jindo.$A = null
+    }
+
     var url = doc.URL;
     var domain_pattern = /^https?:\/\/([^\/]+)/;
     var result = domain_pattern.exec(url);
@@ -128,9 +133,9 @@ console.log('Let\'s Copy Loaded.');
                     jQuery(window).unbind()
                 }
             }
-            console.log("================================");
-            console.log(domain);
-            console.log("================================");
+            //console.log("================================");
+            console.log("Let's Copy :: " + domain);
+            //console.log("================================");
             switch (domain) {
                 case "www.motie.com":
                     element = jQuery(".page-content>pre")[0];
