@@ -1,8 +1,43 @@
-console.log('Hello');
-console.log('Loading Let\'s Copy!');
+function addDomain(domain) {
+    if (!(domain in domains_map)) {
+        console.log("Add `" + domain + "` into enabled map");
+        domains_map[domain] = 1;
+        /*
+        // for removing storage permission, so need to make it be comments
+        chrome.storage.local.set({
+            domains: JSON.stringify(domains_map)
+        }, () => {})
+        */
+    }
+}
+
+function removeDomain(domain) {
+    if (domain in domains_map) {
+        console.log("Remove `" + domain + "` from enabled map");
+        delete domains_map[domain];
+        /*
+        // for removing storage permission, so need to make it be comments
+        chrome.storage.local.set({
+            domains: JSON.stringify(domains_map)
+        }, () => {})
+        */
+    }
+}
+
+function needEnableCopy(url) {
+    if (url && url.substr(0, 4) == "http") {
+        var result = domain_pattern.exec(url);
+        if (result && result[1] in domains_map) {
+            return true
+        }
+    }
+    return false
+}
+
+console.log("Let's Copy Loaded Flag ;)");
 
 var domain_pattern = /^https?:\/\/([^\/]+)/;
-var domains_map = {};
+var domains_map = {}; // for recording domains need to enable copy next time!
 var script_src = chrome.runtime.getURL("./enable.js");
 var inject_script = "var script = document.createElement('script');\tscript.src = '" + script_src + "';\tdocument.body.appendChild(script);";
 
@@ -17,49 +52,6 @@ chrome.tabs.query({
 }, tabs => {
     let url = tabs[0].url
 });
-
-function load() {
-    var domains = "";
-    chrome.storage.local.get("domains", function (result) {
-        domains = result.domains
-    });
-    if (domains) {
-        try {
-            domains_map = JSON.parse(statusString)
-        } catch (e) {
-            domains_map = {}
-        }
-    }
-}
-load();
-
-function addDomain(domain) {
-    if (!(domain in domains_map)) {
-        domains_map[domain] = 1;
-        chrome.storage.local.set({
-            domains: JSON.stringify(domains_map)
-        }, () => {})
-    }
-}
-
-function removeDomain(domain) {
-    if (domain in domains_map) {
-        delete domains_map[domain];
-        chrome.storage.local.set({
-            domains: JSON.stringify(domains_map)
-        }, () => {})
-    }
-}
-
-function needEnableCopy(url) {
-    if (url && url.substr(0, 4) == "http") {
-        var result = domain_pattern.exec(url);
-        if (result && result[1] in domains_map) {
-            return true
-        }
-    }
-    return false
-}
 
 chrome.tabs.onActivated.addListener(activeInfo => updateExtension(activeInfo));
 async function updateExtension(activeInfo) {
@@ -137,6 +129,7 @@ chrome.action.onClicked.addListener(function (tab) {
                 }
             }
         });
+        //console.log(result[1]);
         addDomain(result[1])
     } else {
         script.target.tabId = tab.id
