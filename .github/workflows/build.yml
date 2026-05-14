@@ -1,0 +1,110 @@
+name: Build extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Package zip / crx
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Read manifest version
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./src/manifest.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building Let's Copy v$VERSION"
+
+      - name: Verify tag matches manifest version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          MANIFEST_VERSION="${{ steps.meta.outputs.version }}"
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "::error::Tag v$TAG_VERSION does not match manifest version $MANIFEST_VERSION"
+            exit 1
+          fi
+
+      - name: Validate manifest and lint scripts
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('src/manifest.json','utf8'))"
+          node --check src/background.js
+          node --check src/enable.js
+          node --check src/popup.js
+
+      - name: Build zip
+        id: zip
+        run: |
+          NAME="lets-copy-v${{ steps.meta.outputs.version }}.zip"
+          (cd src && zip -r "../$NAME" . -x '.DS_Store' -x '__MACOSX*' -x '*.map')
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          ls -la "$NAME"
+
+      - name: Build crx (optional, requires CRX_PRIVATE_KEY secret)
+        id: crx
+        env:
+          CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
+        run: |
+          if [ -z "${CRX_PRIVATE_KEY:-}" ]; then
+            echo "::notice::CRX_PRIVATE_KEY secret not set — skipping CRX build."
+            echo "built=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          NAME="lets-copy-v${{ steps.meta.outputs.version }}.crx"
+          KEY_FILE="$(mktemp --suffix=.pem)"
+          printf '%s' "$CRX_PRIVATE_KEY" > "$KEY_FILE"
+          npm install --no-save --silent crx3
+          npx crx3 src/manifest.json --keyPath "$KEY_FILE" --crxPath "$NAME"
+          rm -f "$KEY_FILE"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "built=true" >> "$GITHUB_OUTPUT"
+          ls -la "$NAME"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lets-copy-v${{ steps.meta.outputs.version }}
+          path: |
+            lets-copy-v*.zip
+            lets-copy-v*.crx
+          if-no-files-found: warn
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Let's Copy v${{ steps.meta.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            lets-copy-v*.zip
+            lets-copy-v*.crx
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          body: |
+            ## Install
+
+            ### Chrome Web Store upload (developer)
+            Upload `lets-copy-v${{ steps.meta.outputs.version }}.zip` at https://chrome.google.com/webstore/devconsole
+
+            ### Sideload (load unpacked)
+            1. Download and unzip `lets-copy-v${{ steps.meta.outputs.version }}.zip`
+            2. Open `chrome://extensions/`
+            3. Enable **Developer mode**
+            4. Click **Load unpacked** and select the unzipped folder
+
+            ### Direct install (CRX)
+            If a `.crx` file is attached, drag it into `chrome://extensions/` (some Chrome builds require enterprise policy to allow this).

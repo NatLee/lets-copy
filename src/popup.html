@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Let's Copy</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Let's Copy</h1>
+          <span class="subtitle">Unlock copy, selection &amp; right-click</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Current-site hero card -->
+      <section class="hero" id="hero" data-state="off">
+        <div class="hero-bg" aria-hidden="true"></div>
+        <div class="hero-row">
+          <img class="favicon" id="favicon" alt="" referrerpolicy="no-referrer">
+          <div class="hero-text">
+            <div class="hostname" id="hostname">—</div>
+            <div class="state-label" id="state-label">Disabled on this site</div>
+          </div>
+          <label class="switch" title="Toggle for this site">
+            <input type="checkbox" id="toggle">
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
+        <div class="hero-shortcut">
+          <kbd>Alt</kbd><kbd>Shift</kbd><kbd>C</kbd>
+          <span>to toggle</span>
+          <button class="hero-reload" id="reload-btn" type="button" title="Reload this page so the unlock runs at document_start">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            Reload
+          </button>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section class="card features">
+        <h2 class="card-title">What gets unlocked</h2>
+        <ul class="feature-list">
+          <li>
+            <svg viewBox="0 0 24 24" class="check"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Text selection &amp; <code>user-select</code> CSS
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" class="check"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Copy / Cut / Paste events
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" class="check"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Right-click context menu
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" class="check"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Drag-start image protection
+          </li>
+        </ul>
+      </section>
+
+      <!-- Always on -->
+      <section class="card row-card">
+        <div class="row-text">
+          <div class="row-title">Always on</div>
+          <div class="row-desc">Auto-unlock on every site you visit</div>
+        </div>
+        <label class="switch small" title="Enable on all sites">
+          <input type="checkbox" id="always-on">
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+      </section>
+
+      <!-- Active sites -->
+      <section class="card sites-card">
+        <header class="sites-header">
+          <h2 class="card-title">
+            Active sites
+            <span class="count" id="count">0</span>
+          </h2>
+          <button class="link-btn" id="clear-all" type="button">Clear all</button>
+        </header>
+        <ul class="sites" id="sites-list"></ul>
+        <div class="empty" id="empty-state">
+          <span>No sites yet.</span>
+          <span class="empty-hint">Toggle above to unlock copy on this site.</span>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <a class="footer-link" href="https://github.com/" target="_blank" rel="noopener" id="repo-link">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 .5C5.4.5 0 5.9 0 12.5c0 5.3 3.4 9.8 8.2 11.4.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.4 3.6 1 .1-.8.4-1.4.8-1.7-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.7.3 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.8-1.6 8.2-6.1 8.2-11.4C24 5.9 18.6.5 12 .5z"/></svg>
+        GitHub
+      </a>
+      <span class="version" id="version"></span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

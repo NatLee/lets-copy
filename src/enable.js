@@ -1,547 +1,210 @@
-//console.log('Let\'s Copy Loaded.');
+// Let's Copy — page-side unlock script.
+//
+// Runs in the MAIN world at document_start (when registered as a dynamic
+// content script) or on-demand via chrome.scripting.executeScript when the
+// user just toggled the extension on.
+//
+// Strategy:
+//   1. Install capture-phase listeners that swallow blocking events BEFORE
+//      the page's own handlers can see them. This is what makes right-click
+//      unlock work reliably, since most sites use addEventListener('contextmenu')
+//      which can't be undone by setting `element.oncontextmenu = null`.
+//   2. Strip inline event attributes (oncontextmenu, oncopy, ...) on existing
+//      and future elements via MutationObserver.
+//   3. Inject a stylesheet that overrides `user-select: none` and friends.
+//   4. Apply a couple of well-known site-specific tweaks (CSDN designMode).
 
-(function () {
+(() => {
+  if (window.__letsCopyActive) return;
+  window.__letsCopyActive = true;
 
-    function addAllowUserSelectStyle(selection) {
-        var element = document.createElement("style");
-        element.append(selection + "{-webkit-user-select:auto !important;user-select:auto !important}");
-        body.append(element)
+  // Events we swallow in capture phase. `selectionchange` is intentionally
+  // omitted: it fires AFTER selection happens and isn't preventable, so
+  // stopping it would only break legitimate text-selection UI without
+  // protecting anything.
+  const BLOCKED_EVENTS = [
+    "contextmenu",
+    "selectstart",
+    "copy",
+    "cut",
+    "paste",
+    "beforecopy",
+    "beforecut",
+    "beforepaste",
+    "dragstart",
+  ];
+
+  const INLINE_ATTRS = [
+    "oncontextmenu",
+    "oncopy",
+    "oncut",
+    "onpaste",
+    "onbeforecopy",
+    "onbeforecut",
+    "onbeforepaste",
+    "onselectstart",
+    "onselect",
+    "ondragstart",
+    "onmousedown",
+    "onmouseup",
+    "unselectable",
+  ];
+
+  // 1. Capture-phase blocker — stops any other listener (page-level or element-
+  //    level) from receiving these events. We run at document_start, so we
+  //    register before the page does.
+  const swallow = (e) => {
+    e.stopImmediatePropagation();
+  };
+  for (const evt of BLOCKED_EVENTS) {
+    window.addEventListener(evt, swallow, { capture: true });
+    document.addEventListener(evt, swallow, { capture: true });
+  }
+
+  // Right-click via mousedown(button=2) is sometimes used to suppress menus.
+  // Only neutralise the right-button case so left-click selection still works.
+  const rightClickSwallow = (e) => {
+    if (e.button === 2) e.stopImmediatePropagation();
+  };
+  window.addEventListener("mousedown", rightClickSwallow, { capture: true });
+  window.addEventListener("mouseup", rightClickSwallow, { capture: true });
+
+  // 2. Strip inline handlers on existing and future elements.
+  const clearOn = (el) => {
+    if (!el) return;
+    for (const attr of INLINE_ATTRS) {
+      if (el.removeAttribute) el.removeAttribute(attr);
+      try { el[attr] = null; } catch {}
     }
+  };
 
-    function allowUserSelect(element) {
-        element.setAttribute("style", "user-select: auto !important; -webkit-user-select: auto !important;");
-        return element
+  const sweep = (root) => {
+    if (!root) return;
+    clearOn(root);
+    if (root.querySelectorAll) {
+      const sel = INLINE_ATTRS.map(a => `[${a}]`).join(",");
+      root.querySelectorAll(sel).forEach(clearOn);
     }
+  };
 
-    function allowUserSelectById(element_id) {
-        return allowUserSelect(doc.getElementById(element_id))
+  const initialSweep = () => {
+    clearOn(document);
+    clearOn(document.documentElement);
+    if (document.body) sweep(document.body);
+  };
+
+  // 3. Inject override stylesheet.
+  const STYLE_ID = "__letscopy_style__";
+  const css = `
+    *, *::before, *::after {
+      -webkit-user-select: auto !important;
+      -moz-user-select: auto !important;
+      -ms-user-select: auto !important;
+      user-select: auto !important;
+      -webkit-touch-callout: default !important;
+      -webkit-tap-highlight-color: initial !important;
     }
+    html, body { -webkit-user-select: auto !important; user-select: auto !important; }
+  `;
+  const injectStyle = () => {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = css;
+    (document.head || document.documentElement || document).appendChild(style);
+  };
 
-    function allowUserSelectByClassName(element_class) {
-        var elements = doc.getElementsByClassName(element_class);
-        var len = elements.length;
-        for (var i = 0; i < len; ++i) {
-            allowUserSelect(elements[i])
+  const apply = () => {
+    injectStyle();
+    initialSweep();
+  };
+
+  apply();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", apply, { once: true });
+  }
+
+  // 4. MutationObserver — re-strip handlers when the page mutates (SPAs, lazy
+  //    content, frameworks re-rendering with onContextMenu props, etc.).
+  const startObserver = () => {
+    if (!document.body) {
+      requestAnimationFrame(startObserver);
+      return;
+    }
+    new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === "attributes") {
+          clearOn(m.target);
+        } else {
+          m.addedNodes.forEach(n => {
+            if (n.nodeType === 1) sweep(n);
+          });
         }
-        return elements
-    }
+      }
+    }).observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: INLINE_ATTRS,
+    });
+  };
+  startObserver();
 
-    function clearHandlers() {
-        html.onselectstart = html.oncopy = html.oncut = html.onpaste = html.onkeydown = html.oncontextmenu = html.onmousemove = body.oncopy = body.oncut = body.onpaste = body.onkeydown = body.oncontextmenu = body.onmousedown = body.onmousemove = body.onselectstart = body.ondragstart = doc.onselectstart = doc.oncopy = doc.oncut = doc.onpaste = doc.onkeydown = doc.oncontextmenu = doc.onmousedown = doc.onmouseup = window.onkeyup = window.onkeydown = null;
-        body.oncontextmenu = null;
-        body.onselectstart = null;
-        allowUserSelect(html);
-        allowUserSelect(body)
+  // 5. Site-specific tweaks for cases that need more than the generic pass.
+  try {
+    const host = location.hostname;
+    if (/(^|\.)csdn\.net$/.test(host)) {
+      // CSDN's code block uses CSS contenteditable trickery; flipping designMode
+      // makes selection work everywhere.
+      if (document.designMode === "off") document.designMode = "on";
     }
+  } catch {}
 
-    function defaultHandler(event) {
-        event.returnValue = true
-    }
+  // 6. Toast — only when injected after the page already loaded (i.e. the user
+  //    just toggled the extension on). On document_start auto-injection the
+  //    readyState is "loading" and we stay silent so it doesn't flash on every
+  //    visit to an enabled site.
+  if (document.readyState !== "loading") showToast();
 
-    function removeEventAttributes(element) {
-        element.removeAttribute("oncontextmenu");
-        element.removeAttribute("ondragstart");
-        element.removeAttribute("onselectstart");
-        element.removeAttribute("onselect");
-        element.removeAttribute("oncopy");
-        element.removeAttribute("onbeforecopy");
-        element.removeAttribute("oncut");
-        element.removeAttribute("onpaste");
-        element.removeAttribute("onclick");
-        element.removeAttribute("onmousedown");
-        element.removeAttribute("onmouseup")
-    }
-
-    function replaceElementEventsWithClone(element) {
-        var clone = element.cloneNode();
-        while (element.firstChild) {
-            clone.appendChild(element.firstChild)
-        }
-        element.parentNode.replaceChild(clone, element)
-    }
-
-    function replaceElementsEventsWithClone(elements) {
-        var length = elements.length;
-        for (var i = 0; i < length; ++i) {
-            replaceElementEventsWithClone(elements[i])
-        }
-    }
-
-    document.body.style.color = "purple";
-    var doc = document;
-    var body = doc.body;
-    var html = doc.documentElement;
-
-    clearHandlers();
-
-    for (event_type in ["selectstart", "copy", "cut", "paste", "keydown", "contextmenu", "dragstart"]) {
-        html.addEventListener(event_type, defaultHandler);
-        body.addEventListener(event_type, defaultHandler);
-        doc.addEventListener(event_type, defaultHandler)
-    }
-
-    var jQuery = window.jQuery;
-    var $Fn = window.$Fn;
-    if ($Fn) {
-        try {
-            $Fn.freeElement(doc);
-            $Fn.freeElement(body)
-        } catch (e) {}
-    }
-    var jindo = window.jindo;
-    if (jindo) {
-        jindo.$A = null
-    }
-
-    var url = doc.URL;
-    var domain_pattern = /^https?:\/\/([^\/]+)/;
-    var result = domain_pattern.exec(url);
-    if (result) {
-        try {
-            var domain = result[1];
-            if (domain.length > 11 && domain.substr(-11, 11) == ".lofter.com") {
-                replaceElementsEventsWithClone(jQuery(".pic>a"));
-                return
-            }
-            switch (domain) {
-                case "wenku.baidu.com":
-                    jQuery(".doc-reader").off("copy").removeAttr("oncopy");
-                    jQuery("#reader-container-1").off("copy");
-                    return;
-                case "www.qidian.com":
-                case "read.qidian.com":
-                case "vipreader.qidian.com":
-                case "big5.qidian.com":
-                case "www.qdmm.com":
-                    var element = doc.getElementById("bigcontbox");
-                    if (element) {
-                        element.onmousedown = null
-                    }
-                    jQuery(body).off("contextmenu copy cut");
-                    return
-            }
-            if (jQuery) {
-                var $doc = jQuery(doc);
-                var $body = jQuery(body);
-                if ($doc.off) {
-                    $doc.off();
-                    $body.off();
-                    jQuery(window).off()
-                } else {
-                    $doc.unbind();
-                    $body.unbind();
-                    jQuery(window).unbind()
-                }
-            }
-            //console.log("================================");
-            console.log("Let's Copy :: " + domain);
-            //console.log("================================");
-            switch (domain) {
-                case "www.motie.com":
-                    element = jQuery(".page-content>pre")[0];
-                    element.ondragstart = element.oncopy = element.oncut = element.oncontextmenu = null;
-                    break;
-                case "board.miznet.daum.net":
-                    var gaia = unsafeWindow.gaia;
-                    doc.removeEventListener("selectstart", gaia.blockContent, false);
-                    doc.removeEventListener("dragstart", gaia.blockContent, false);
-                    doc.removeEventListener("contextmenu", gaia.blockContent, false);
-                    doc.removeEventListener("copy", gaia.blockContent, false);
-                    doc.removeEventListener("keydown", gaia.blockContent, false);
-                    break;
-                case "book.zongheng.com":
-                    jQuery("<style>.reader_box, .reader_box .content p{-webkit-user-select:auto !important}</style>").appendTo(body);
-                    element = doc.getElementsByClassName("reader_box")[0];
-                    element.removeAttribute("onselectstart");
-                    element.removeAttribute("unselectable");
-                    break;
-                case "www.kasi-time.com":
-                    element = doc.getElementById("center");
-                    if (element) {
-                        element.onmousedown = null;
-                        allowUserSelectByClassName("mainkashi")
-                    }
-                    break;
-                case "detail.china.alibaba.com":
-                    jQuery("div.mod-detail-gallery").unbind();
-                    break;
-                case "www.businessweekly.com.tw":
-                    jQuery("div.maincontent").unbind();
-                    break;
-                case "bettereducation.com.au":
-                    jQuery("div.main").unbind();
-                    break;
-                case "petitlyrics.com":
-                    allowUserSelectById("lyrics_window");
-                    break;
-                case "tv.cntv.cn":
-                    allowUserSelectById("epg_list");
-                    break;
-                case "www.hbooker.com":
-                    allowUserSelectById("J_BookRead");
-                    break;
-                case "www.fanfiction.net":
-                    allowUserSelectById("storytextp");
-                    break;
-                case "www.ghrlib.com":
-                case "www.melodog.com.tw":
-                    allowUserSelectByClassName("unselectable");
-                    break;
-                case "www.vice.cn":
-                    allowUserSelectByClassName("noselect");
-                    break;
-                case "utaten.com":
-                    allowUserSelectByClassName("lyricBody");
-                    allowUserSelectByClassName("lyricBody ");
-                    break;
-                case "www.medialnk.com":
-                case "www.buzzhand.com":
-                    allowUserSelectByClassName("article_wrap");
-                    break;
-                case "wiki.mh4g.org":
-                    element = doc.getElementById("data_container");
-                    allowUserSelect(element);
-                    element.onmousedown = element.onselectstart = null;
-                    break;
-                case "www.buzzhand.com":
-                    jQuery("#articleContent>p").css("-webkit-user-select", "auto");
-                    break;
-                case "ww.happies.news":
-                case "ww.share001.org":
-                case "ww.daliulian.net":
-                    jQuery("#article-content>p").unbind().css("-webkit-user-select", "auto");
-                    break;
-                case "yuedu.163.com":
-                case "caiwei.yuedu.163.com":
-                case "guofeng.yuedu.163.com":
-                    setTimeout(function () {
-                        jQuery("<style>.portrait-player .article{-webkit-user-select:auto;user-select:auto}</style>").appendTo(jQuery(body).unbind());
-                        $element = jQuery("#J_Player").unbind();
-                        replaceElementEventsWithClone($element[0])
-                    }, 1e3);
-                    break;
-                case "office.fang.com":
-                    doc.querySelector(".describe>div").onselectstart = null;
-                    break;
-                case "pad.skyozora.com":
-                case "vendor.tahoecn.com":
-                case "www.iyingdi.cn":
-                case "www.gardenia.net":
-                    jQuery("<style>*{-webkit-user-select:auto;user-select:auto}</style>").appendTo(body);
-                    break;
-                case "news.cari.com.my":
-                    element = jQuery(".bm .d")[0];
-                    element.onmousedown = element.onselectstart = null;
-                    allowUserSelect(element);
-                    break;
-                case "www.ttpaihang.com":
-                    element = jQuery("table[oncontextmenu]")[0];
-                    element.oncontextmenu = element.oncopy = null;
-                    break;
-                case "www.teepr.com":
-                    jQuery("a").off();
-                    break;
-                case "www.zcool.com.cn":
-                    jQuery("img").unbind();
-                    break;
-                case "photo.xuite.net":
-                    jQuery("img.fixed").unbind("contextmenu");
-                    break;
-                case "www.van698.com":
-                case "www.91yanqing.com":
-                case "www.99lib.net":
-                    replaceElementEventsWithClone(body);
-                    doc.body.oncontextmenu = function (e) {
-                        e.stopPropagation()
-                    };
-                    break;
-                case "rocklyric.jp":
-                    element = doc.getElementById("lyric_area");
-                    allowUserSelect(element);
-                    element.oncopy = element.oncut = element.onmousemove = element.onmousedown = element.children[0].oncontextmenu = null;
-                    break;
-                case "kmweb.coa.gov.tw":
-                    element = doc.getElementById("pl");
-                    element.oncontextmenu = element.onselectstart = element.ondragstart = null;
-                    break;
-                case "www.mygreatdaily.com":
-                case "www.thegreatdaily.com":
-                    var $elements = jQuery("p").off();
-                    var length = $elements.length;
-                    for (var i = 0; i < length; ++i) {
-                        allowUserSelect($elements[i])
-                    }
-                    break;
-                case "mojim.com":
-                    allowUserSelectById("fsZ");
-                    break;
-                case "storybird.com":
-                    allowUserSelectByClassName("cm-component");
-                    break;
-                case "su.lianjia.com":
-                    allowUserSelectByClassName("xiaoquOverview");
-                    break;
-                case "life.tw":
-                    element = doc.getElementById("mainContent").getElementsByTagName("iframe");
-                    if (element.length) {
-                        element = element[0].contentWindow.document;
-                        element.oncontextmenu = element.onselectstart = element.onselect = null;
-                        jQuery(element).off()
-                    }
-                    break;
-                case "www.coco01.today":
-                    jQuery("[unselectable]").off().removeAttr("unselectable").each(function () {
-                        allowUserSelect(this)
-                    });
-                    break;
-                case "news.missevan.com":
-                    element = doc.getElementById("article");
-                    element.oncontextmenu = element.onselectstart = null;
-                    break;
-                case "hk.koreadepart.com":
-                case "tw.koreadepart.com":
-                    Evt.remove(doc, "mousedown", MouseEvent.no_right);
-                    Evt.remove(doc, "contextmenu", MouseEvent.stop_event);
-                    Evt.remove(doc, "selectstart", MouseEvent.stop_event);
-                    break;
-                case "chokstick.com":
-                    jQuery("<style>.disable-select{webkit-user-select:auto;user-select:auto}</style>").appendTo(body);
-                    break;
-                case "imac.hk":
-                    window.jQuery = function () {
-                        return {
-                            css: function () {}
-                        }
-                    };
-                    allowUserSelect(html);
-                    allowUserSelectByClassName("entry-content");
-                    break;
-                case "www.uta-net.com":
-                    jQuery("<style>#flash_area>img{display:none}</style>").appendTo(body);
-                    break;
-                case "ycg.qq.com":
-                    elements = doc.getElementsByClassName("box-cover-works");
-                    length = elements.length;
-                    for (i = 0; i < length; i++) {
-                        element = elements[i];
-                        element.oncontextmenu = element.onselectstart = null
-                    }
-                    break;
-                case "fanyi.youdao.com":
-                    allowUserSelectByClassName("doc__container--unpay");
-                    break;
-                case "mdpr.jp":
-                    elements = doc.getElementsByTagName("img");
-                    length = elements.length;
-                    for (i = 0; i < length; i++) {
-                        element = elements[i];
-                        element.oncontextmenu = element.onmousedown = element.onselectstart = null
-                    }
-                    break;
-                case "www.bilibili.com":
-                    jQuery(".article-holder.unable-reprint").off().css("-webkit-user-select", "auto").css("user-select", "auto");
-                    break;
-                case "www.webtoons.com":
-                    elements = doc.getElementsByTagName("img");
-                    length = elements.length;
-                    for (i = 0; i < length; i++) {
-                        element = elements[i];
-                        element.oncontextmenu = element.ondragstart = element.onselectstart = null
-                    }
-                    break;
-                case "www.winentaste.com":
-                    element = doc.getElementsByTagName("main");
-                    if (element.length) {
-                        element = element[0];
-                        element.oncontextmenu = element.onselectstart = null
-                    }
-                    break;
-                case "www.oricon.co.jp":
-                    element = doc.getElementsByClassName("all-lyrics");
-                    if (element.length) {
-                        element = element[0];
-                        allowUserSelect(element);
-                        element.oncontextmenu = element.onmousedown = element.onselectstart = null
-                    }
-                    break;
-                case "hshi.58.com":
-                    jQuery("#generalDesc").off();
-                    break;
-                case "www.heatmetering.cn":
-                    jQuery(".box").unbind();
-                    break;
-                case "time.geekbang.org":
-                    setTimeout(function () {
-                        replaceElementsEventsWithClone(doc.getElementsByClassName("_2qqGfSEe_0"))
-                    }, 1e3);
-                    break;
-                case "www.jerecuperemonex.com":
-                    jQuery(".unselectable").removeClass("unselectable").removeAttr("unselectable");
-                    break;
-                case "ms.zjer.cn":
-                    element = doc.getElementById("stop");
-                    element.oncontextmenu = element.onselectstart = element.onmousedown = element.onmouseup = null;
-                    break;
-                case "mail-reibun.com":
-                    jQuery("<style>.manner.supervision{-webkit-user-select:auto;user-select:auto}</style>").appendTo(body);
-                    break;
-                case "www.canalys.com":
-                    allowUserSelectById("article");
-                    break;
-                case "www.yifatong.com":
-                    element = doc.getElementById("contract_content");
-                    allowUserSelect(element);
-                    jQuery(element).unbind();
-                    break;
-                case "weibo.com":
-                    elements = doc.getElementsByClassName("WBA_content");
-                    if (elements.length > 0) {
-                        elements = elements[0].getElementsByTagName("div");
-                        if (elements.length > 0) {
-                            element = elements[0];
-                            element.removeAttribute("oncopy");
-                            element.removeAttribute("oncut");
-                            element.removeAttribute("onselectstart");
-                            replaceElementEventsWithClone(element)
-                        }
-                    }
-                    break;
-                case "www.longmabookcn.com":
-                    removeEventAttributes(body);
-                    element = doc.getElementById("readpagewidth");
-                    removeEventAttributes(element);
-                    allowUserSelect(element);
-                    element = doc.getElementById("paperrall");
-                    removeEventAttributes(element);
-                    allowUserSelect(element);
-                    element = doc.getElementById("mypaperhouse");
-                    removeEventAttributes(element);
-                    allowUserSelect(element);
-                    element = doc.getElementById("mypaperhome");
-                    removeEventAttributes(element);
-                    allowUserSelect(element);
-                    element = doc.getElementById("mypaper");
-                    removeEventAttributes(element);
-                    allowUserSelect(element);
-                    jQuery("<style>*:not(input):not(textarea){-webkit-user-select:auto}</style>").appendTo(body);
-                    break;
-                case "beetify.com":
-                    allowUserSelect(body);
-                    jQuery("<style>body{user-select:auto !important}</style>").appendTo(body);
-                    break;
-                case "www.hzmedia.com.cn":
-                    allowUserSelect(doc.getElementById("content"));
-                    break;
-                case "www.goeugo.com":
-                    jQuery("div.main").unbind();
-                    break;
-                case "car.ctrip.com":
-                    allowUserSelectByClassName("beginners-guide");
-                    break;
-                case "www.chinathinktanks.org.cn":
-                    elements = doc.getElementsByClassName("container");
-                    if (elements.length > 0) {
-                        removeEventAttributes(elements[0])
-                    }
-                    break;
-                case "www.liuxue86.com":
-                    replaceElementEventsWithClone(doc.getElementById("article-content"));
-                    break;
-                case "www.horou.com":
-                    addAllowUserSelectStyle("*");
-                    break;
-                case "www.sis001.com":
-                    allowUserSelectByClassName("noSelect");
-                    break;
-                case "ulsterherald.com":
-                    jQuery("<style>*:not(input):not(textarea){-webkit-user-select:auto}</style>").appendTo(body);
-                    break;
-                case "app.motie.com":
-                    elements = doc.getElementsByClassName("note");
-                    for (i = 0; i < elements.length; ++i) {
-                        element = elements[i];
-                        removeEventAttributes(element)
-                    }
-                    break;
-                case "www.laokaoya.com":
-                    jQuery("<style>html,body,div,p,span{-webkit-user-select:auto !important;user-select:auto !important}::selection{background-color:#dcdcdc !important}</style>").appendTo(body);
-                    break;
-                case "sosad.fun":
-                    allowUserSelectByClassName("chapter");
-                    addAllowUserSelectStyle(".no-selection");
-                    break;
-                case "www.wattpad.com":
-                    jQuery("[oncontextmenu]").removeAttr("oncontextmenu");
-                    break;
-                case "www.pressplay.cc":
-                    elements = doc.getElementsByClassName("article-content-box");
-                    var len = elements.length;
-                    for (var i = 0; i < len; ++i) {
-                        element = elements[i];
-                        allowUserSelect(element);
-                        var elements2 = element.getElementsByTagName("p");
-                        var len2 = elements2.length;
-                        for (var i = 0; i < len2; ++i) {
-                            allowUserSelect(elements2[i])
-                        }
-                    }
-                    elements = doc.getElementsByClassName("project-timeline-article-page");
-                    if (elements.length > 0) {
-                        element = elements[0];
-                        element.oncontextmenu = element.ondragstart = element.onselectstart = null
-                    }
-                    break;
-                case "www.bcquan.me":
-                    allowUserSelectByClassName("noselect");
-                    elements = doc.getElementsByClassName("news_detail");
-                    if (elements.length > 0) {
-                        element = elements[0];
-                        element.oncontextmenu = element.ondragstart = element.onselectstart = null
-                    }
-                    break;
-                case "www.xuexi.la":
-                    Cookies.set(cookieKey, 0);
-                    break;
-                case "vip.shulink.com":
-                    allowUserSelectByClassName("acontent");
-                    break;
-                case "www.8591.com.tw":
-                    allowUserSelectById("editer_main").onselectstart = null;
-                    break;
-                case "buzzlife.info":
-                    removeEventAttributes(body);
-                    break;
-                case "memeon-music.com":
-                    window.removeEventListener("keyup", wpccpDisableKeys);
-                    window.removeEventListener("keyup", wpccpDisableCtrlActions);
-                    window.removeEventListener("keydown", wpccpDisableKeys);
-                    window.removeEventListener("keydown", wpccpDisableCtrlActions);
-                case "focus2move.com":
-                    jQuery("<style>:not(input):not(textarea), img{-webkit-user-select:auto;user-select:auto}</style>").appendTo(body);
-                    break;
-                case "www.hunanhr.cn":
-                case "www.xuexila.com":
-                    doc.cookie = "is_scan=1; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/";
-                    break;
-                case "m.lieyunwang.com":
-                    jQuery("<style>*{-webkit-user-select:auto}</style>").appendTo(body);
-                    break;
-                case "www.chinatupai.com":
-                    removeEventAttributes(doc.getElementById("showbox"));
-                    break;
-                case "ibankops.blogspot.com":
-                    addAllowUserSelectStyle(".post-body");
-                    break
-                case "blog.csdn.net":
-                    const contentEditableFlag = document.designMode;
-                    if (contentEditableFlag === 'off') {
-                        console.log('CSDN Code block copy ENABLE!')
-                        document.designMode='on';
-                    }
-                    break;
-            }
-        } catch (e) {
-            console.log(e)
-        }
-    }
+  function showToast() {
+    const TOAST_ID = "__letscopy_toast__";
+    const run = () => {
+      if (document.getElementById(TOAST_ID)) return;
+      const root = document.body || document.documentElement;
+      if (!root) return;
+      const el = document.createElement("div");
+      el.id = TOAST_ID;
+      el.textContent = "Let's Copy 已啟用";
+      el.style.cssText = [
+        "all: initial",
+        "position: fixed",
+        "top: 18px",
+        "right: 18px",
+        "z-index: 2147483647",
+        "padding: 9px 14px",
+        "border-radius: 10px",
+        "background: linear-gradient(135deg, #6366f1, #8b5cf6)",
+        "color: #fff",
+        'font: 600 12.5px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif',
+        "letter-spacing: 0.02em",
+        "box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35)",
+        "opacity: 0",
+        "transform: translateY(-6px)",
+        "transition: opacity .22s ease, transform .22s ease",
+        "pointer-events: none",
+      ].join(";");
+      root.appendChild(el);
+      requestAnimationFrame(() => {
+        el.style.opacity = "1";
+        el.style.transform = "translateY(0)";
+      });
+      setTimeout(() => {
+        el.style.opacity = "0";
+        el.style.transform = "translateY(-6px)";
+        setTimeout(() => { try { el.remove(); } catch {} }, 280);
+      }, 1400);
+    };
+    if (document.body) run();
+    else document.addEventListener("DOMContentLoaded", run, { once: true });
+  }
 })();

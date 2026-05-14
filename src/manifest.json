@@ -1,34 +1,40 @@
 {
-  "update_url": "https://clients2.google.com/service/update2/crx",
   "name": "Let's Copy",
-  "version": "1.0",
+  "version": "2.0.0",
   "manifest_version": 3,
-  "description": "Allow copy in parts of websites.",
+  "description": "Unlock copy, text selection, and right-click on websites that disable them.",
+  "homepage_url": "https://github.com/NatLee/lets-copy",
   "icons": {
     "24": "icons/icon24.png",
     "32": "icons/icon32.png",
     "128": "icons/icon128.png"
   },
-	"action": {
-    "default_icon": "icons/icon24-disable.png",
-    "default_title": "Let's Copy"
-	},
-  "host_permissions": [ "<all_urls>"],
-  "content_security_policy": {"extension_pages": "script-src 'self'; object-src 'self'"},
+  "action": {
+    "default_icon": {
+      "24": "icons/icon24-disable.png",
+      "32": "icons/icon32-disable.png",
+      "128": "icons/icon128-disable.png"
+    },
+    "default_title": "Let's Copy",
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
+  "commands": {
+    "toggle-current-site": {
+      "suggested_key": {
+        "default": "Alt+Shift+C"
+      },
+      "description": "Toggle Let's Copy for the current site"
     }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["enable.js"],
-      "matches": ["<all_urls>"],
-      "use_dynamic_url": true
-    }
-  ]
+  }
 }

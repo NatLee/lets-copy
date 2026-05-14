@@ -1,0 +1,74 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.github/workflows/**'
+
+jobs:
+  lint:
+    name: Manifest + JS syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate manifest.json
+        run: node -e "JSON.parse(require('fs').readFileSync('src/manifest.json','utf8'))"
+
+      - name: Check JS syntax
+        run: |
+          node --check src/background.js
+          node --check src/enable.js
+          node --check src/popup.js
+
+      - name: Verify required files exist
+        run: |
+          set -e
+          required_files=(
+            src/manifest.json
+            src/background.js
+            src/enable.js
+            src/popup.html
+            src/popup.css
+            src/popup.js
+          )
+          for f in "${required_files[@]}"; do
+            [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
+          done
+
+      - name: Verify icons referenced in manifest exist
+        run: |
+          set -e
+          required_icons=(
+            icons/icon24.png
+            icons/icon32.png
+            icons/icon128.png
+            icons/icon24-disable.png
+            icons/icon32-disable.png
+            icons/icon128-disable.png
+          )
+          for f in "${required_icons[@]}"; do
+            [ -f "src/$f" ] || { echo "::error::Missing src/$f"; exit 1; }
+          done
+
+      - name: Check manifest version is bumped vs main (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin main --depth=1
+          BASE_VERSION=$(git show origin/main:src/manifest.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" || echo "0.0.0")
+          PR_VERSION=$(node -p "require('./src/manifest.json').version")
+          echo "main: $BASE_VERSION  →  PR: $PR_VERSION"
+          if [ "$BASE_VERSION" = "$PR_VERSION" ]; then
+            echo "::warning::manifest.json version unchanged ($PR_VERSION). Bump it before tagging a release."
+          fi

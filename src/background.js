@@ -1,142 +1,232 @@
-function addDomain(domain) {
-    if (!(domain in domains_map)) {
-        console.log("Add `" + domain + "` into enabled map");
-        domains_map[domain] = 1;
-        /*
-        // for removing storage permission, so need to make it be comments
-        chrome.storage.local.set({
-            domains: JSON.stringify(domains_map)
-        }, () => {})
-        */
-    }
-}
+// Let's Copy — background service worker.
+//
+// Responsibilities:
+//   - Persist the list of hosts where copy-unlock is enabled.
+//   - Inject enable.js into the active tab when the user toggles ON.
+//   - Dynamically register a MAIN-world, document_start content script for each
+//     enabled host so that capture-phase event blockers run BEFORE the page's
+//     own anti-copy handlers register. This is what fixes right-click locking.
+//   - Keep the toolbar icon/badge in sync with the current tab's state.
 
-function removeDomain(domain) {
-    if (domain in domains_map) {
-        console.log("Remove `" + domain + "` from enabled map");
-        delete domains_map[domain];
-        /*
-        // for removing storage permission, so need to make it be comments
-        chrome.storage.local.set({
-            domains: JSON.stringify(domains_map)
-        }, () => {})
-        */
-    }
-}
+const STORAGE_KEYS = { hosts: "enabledHosts", alwaysOn: "alwaysOn" };
+const DYNAMIC_SCRIPT_ID = "letscopy-autoinject";
 
-function needEnableCopy(url) {
-    if (url && url.substr(0, 4) == "http") {
-        var result = domain_pattern.exec(url);
-        if (result && result[1] in domains_map) {
-            return true
-        }
-    }
-    return false
-}
-
-console.log("Let's Copy Loaded Flag ;)");
-
-var domain_pattern = /^https?:\/\/([^\/]+)/;
-var domains_map = {}; // for recording domains need to enable copy next time!
-var script_src = chrome.runtime.getURL("./enable.js");
-var inject_script = "var script = document.createElement('script');\tscript.src = '" + script_src + "';\tdocument.body.appendChild(script);";
-
-var script = {
-    target: {},
-    files: ["./enable.js"]
+const state = {
+  enabledHosts: new Set(),
+  alwaysOn: false,
 };
 
-chrome.tabs.query({
-    active: true,
-    lastFocusedWindow: true
-}, tabs => {
-    let url = tabs[0].url
-});
-
-chrome.tabs.onActivated.addListener(activeInfo => updateExtension(activeInfo));
-async function updateExtension(activeInfo) {
-    try {
-        chrome.tabs.get(activeInfo.tabId, function (tab) {
-            chrome.action.setIcon({
-                path: needEnableCopy(tab.url) ? "icons/icon24.png" : "icons/icon24-disable.png",
-                tabId: activeInfo.tabId
-            })
-        })
-    } catch (error) {
-        if (error == "Error: Tabs cannot be edited right now (user may be dragging a tab).") {
-            setTimeout(() => updateExtension(activeInfo), 50)
-        }
-    }
+async function loadState() {
+  const stored = await chrome.storage.local.get([STORAGE_KEYS.hosts, STORAGE_KEYS.alwaysOn]);
+  state.enabledHosts = new Set(stored[STORAGE_KEYS.hosts] || []);
+  state.alwaysOn = !!stored[STORAGE_KEYS.alwaysOn];
+  await syncDynamicScripts();
 }
 
-chrome.tabs.onUpdated.addListener(function (tabId, changeInfo, tab) {
-    if (changeInfo.status == "complete") {
-        if (needEnableCopy(changeInfo.url || tab.url)) {
-            script.target.tabId = tab.id;
-            chrome.tabs.query({
-                active: true,
-                currentWindow: true
-            }, function (tabs) {
-                chrome.tabs.sendMessage(tabs[0].id, {
-                    greeting: "hello"
-                }, function (response) {})
-            });
-            chrome.action.setIcon({
-                path: "icons/icon24.png",
-                tabId: tab.id
-            })
-        } else {}
+async function saveState() {
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.hosts]: [...state.enabledHosts],
+    [STORAGE_KEYS.alwaysOn]: state.alwaysOn,
+  });
+}
+
+function hostOf(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol.startsWith("http") ? u.hostname : null;
+  } catch {
+    return null;
+  }
+}
+
+function isEnabledFor(host) {
+  return !!host && (state.alwaysOn || state.enabledHosts.has(host));
+}
+
+async function syncDynamicScripts() {
+  // Remove the previous registration (ignore "not found" errors).
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: [DYNAMIC_SCRIPT_ID] });
+  } catch {}
+
+  const matches = state.alwaysOn
+    ? ["<all_urls>"]
+    : [...state.enabledHosts].map(h => `*://${h}/*`);
+
+  if (matches.length === 0) return;
+
+  try {
+    await chrome.scripting.registerContentScripts([{
+      id: DYNAMIC_SCRIPT_ID,
+      matches,
+      js: ["enable.js"],
+      runAt: "document_start",
+      world: "MAIN",
+      allFrames: true,
+      persistAcrossSessions: true,
+    }]);
+  } catch (err) {
+    console.warn("[Let's Copy] registerContentScripts failed:", err);
+  }
+}
+
+async function injectNow(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      files: ["enable.js"],
+      world: "MAIN",
+      injectImmediately: true,
+    });
+  } catch (err) {
+    // Common cases: chrome:// pages, web store, etc. — silently ignore.
+    console.debug("[Let's Copy] executeScript skipped:", err?.message);
+  }
+}
+
+async function updateActionUI(tabId, host) {
+  const on = isEnabledFor(host);
+  try {
+    await chrome.action.setIcon({
+      tabId,
+      path: on
+        ? { 24: "icons/icon24.png", 32: "icons/icon32.png", 128: "icons/icon128.png" }
+        : { 24: "icons/icon24-disable.png", 32: "icons/icon32-disable.png", 128: "icons/icon128-disable.png" },
+    });
+    await chrome.action.setBadgeText({ tabId, text: on ? "ON" : "" });
+    if (on) {
+      await chrome.action.setBadgeBackgroundColor({ tabId, color: "#10b981" });
     }
+  } catch {}
+}
+
+async function enableHost(host) {
+  if (!host) return;
+  state.enabledHosts.add(host);
+  await saveState();
+  await syncDynamicScripts();
+}
+
+async function disableHost(host) {
+  if (!host) return;
+  state.enabledHosts.delete(host);
+  await saveState();
+  await syncDynamicScripts();
+}
+
+async function getActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tab || null;
+}
+
+async function toggleCurrentTab() {
+  const tab = await getActiveTab();
+  if (!tab) return;
+  const host = hostOf(tab.url);
+  if (!host) return;
+  if (isEnabledFor(host)) {
+    await disableHost(host);
+    await chrome.tabs.reload(tab.id);
+  } else {
+    await enableHost(host);
+    await injectNow(tab.id);
+  }
+  await updateActionUI(tab.id, host);
+}
+
+// ── Listeners ───────────────────────────────────────────────────────────────
+
+// Service workers can wake up any time and listeners may fire before
+// loadState() resolves. Gate every handler on this promise so they never read
+// an empty in-memory `state` (which would mis-render badges or drop hosts).
+const ready = loadState();
+chrome.runtime.onInstalled.addListener(loadState);
+chrome.runtime.onStartup.addListener(loadState);
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  await ready;
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    await updateActionUI(tabId, hostOf(tab.url));
+  } catch {}
 });
 
-chrome.action.onClicked.addListener(function (tab) {
-    var url = tab.url;
-    if (url && url.substr(0, 4) == "http") {
-        var result = domain_pattern.exec(url);
-        if (result && result[1] in domains_map) {
-            script.target.tabId = tab.id;
-            removeDomain(result[1]);
-            chrome.action.setIcon({
-                path: "icons/icon24-disable.png",
-                tabId: tab.id
-            });
-            return
-        }
-        chrome.windows.getAll({
-            populate: true
-        }, function (windows) {
-            for (var i = 0; i < windows.length; ++i) {
-                var tabs = windows[i].tabs;
-                var length = tabs.length;
-                var domain = result[1];
-                for (j = 0; j < length; ++j) {
-                    var tab = tabs[j];
-                    var url = tab.url;
-                    if (url && url.substr(0, 4) == "http") {
-                        var result2 = domain_pattern.exec(url);
-                        if (result2 && result2[1] == domain) {
-                            script.target.tabId = tab.id;
-                            chrome.tabs.query({
-                                active: true,
-                                currentWindow: true
-                            }, function (tabs) {
-                                chrome.tabs.sendMessage(tabs[0].id, {
-                                    greeting: "hello"
-                                }, function (response) {})
-                            })
-                        }
-                    }
-                }
-            }
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "loading" && changeInfo.status !== "complete") return;
+  await ready;
+  await updateActionUI(tabId, hostOf(tab.url));
+});
+
+chrome.commands.onCommand.addListener(async (command) => {
+  await ready;
+  if (command === "toggle-current-site") await toggleCurrentTab();
+});
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  (async () => {
+    await ready;
+    switch (msg?.type) {
+      case "getState": {
+        const tab = await getActiveTab();
+        const host = tab ? hostOf(tab.url) : null;
+        sendResponse({
+          host,
+          tabId: tab?.id ?? null,
+          favicon: tab?.favIconUrl || null,
+          enabledHosts: [...state.enabledHosts].sort(),
+          alwaysOn: state.alwaysOn,
+          currentEnabled: isEnabledFor(host),
+          injectable: !!host,
         });
-        //console.log(result[1]);
-        addDomain(result[1])
-    } else {
-        script.target.tabId = tab.id
+        break;
+      }
+      case "toggleCurrent": {
+        await toggleCurrentTab();
+        sendResponse({ ok: true });
+        break;
+      }
+      case "disableHost": {
+        await disableHost(msg.host);
+        const tab = await getActiveTab();
+        if (tab) await updateActionUI(tab.id, hostOf(tab.url));
+        sendResponse({ ok: true });
+        break;
+      }
+      case "enableHost": {
+        await enableHost(msg.host);
+        const tab = await getActiveTab();
+        if (tab) {
+          await updateActionUI(tab.id, hostOf(tab.url));
+          if (hostOf(tab.url) === msg.host) await injectNow(tab.id);
+        }
+        sendResponse({ ok: true });
+        break;
+      }
+      case "setAlwaysOn": {
+        state.alwaysOn = !!msg.value;
+        await saveState();
+        await syncDynamicScripts();
+        const tab = await getActiveTab();
+        if (tab) {
+          await updateActionUI(tab.id, hostOf(tab.url));
+          if (state.alwaysOn) await injectNow(tab.id);
+        }
+        sendResponse({ ok: true });
+        break;
+      }
+      case "clearAll": {
+        state.enabledHosts.clear();
+        state.alwaysOn = false;
+        await saveState();
+        await syncDynamicScripts();
+        const tab = await getActiveTab();
+        if (tab) await updateActionUI(tab.id, hostOf(tab.url));
+        sendResponse({ ok: true });
+        break;
+      }
+      default:
+        sendResponse({ ok: false, error: "unknown message" });
     }
-    chrome.action.setIcon({
-        path: "icons/icon24.png",
-        tabId: tab.id
-    })
+  })();
+  return true; // keep the response channel open for the async work above
 });
-
