@@ -68,7 +68,7 @@ jobs:
           KEY_FILE="$(mktemp --suffix=.pem)"
           printf '%s' "$CRX_PRIVATE_KEY" > "$KEY_FILE"
           npm install --no-save --silent crx3
-          npx crx3 src/manifest.json --keyPath "$KEY_FILE" --crxPath "$NAME"
+          npx crx3 src -p "$KEY_FILE" -o "$NAME"
           rm -f "$KEY_FILE"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "built=true" >> "$GITHUB_OUTPUT"

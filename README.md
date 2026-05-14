@@ -1,5 +1,9 @@
 # Let's Copy
 
+[![Build](https://github.com/NatLee/lets-copy/actions/workflows/build.yml/badge.svg)](https://github.com/NatLee/lets-copy/actions/workflows/build.yml)
+[![Validate](https://github.com/NatLee/lets-copy/actions/workflows/validate.yml/badge.svg)](https://github.com/NatLee/lets-copy/actions/workflows/validate.yml)
+[![Release](https://img.shields.io/github/v/release/NatLee/lets-copy?display_name=tag&sort=semver)](https://github.com/NatLee/lets-copy/releases/latest)
+
 A Chrome extension that unlocks **copy**, **text selection**, and **right-click** on websites that disable them.
 
 ![](./doc/enable-csdn-code-block.png)
@@ -25,10 +29,40 @@ The extension also:
 
 ## Install
 
-1. `bash package.sh` (or zip the `src/` folder yourself)
-2. Open `chrome://extensions/`
-3. Enable **Developer mode**
-4. Drag the zip in, or click **Load unpacked** and select `src/`
+### From a release
+
+Download `lets-copy-vX.Y.Z.zip` from the [Releases page](https://github.com/NatLee/lets-copy/releases/latest), unzip it, then in Chrome:
+
+1. Open `chrome://extensions/`
+2. Enable **Developer mode**
+3. Click **Load unpacked** and select the unzipped folder
+
+### From source
+
+```bash
+# Unix / git-bash
+bash package.sh
+```
+
+```powershell
+# Windows PowerShell
+.\package.ps1
+```
+
+Both produce `lets-copy-vX.Y.Z.zip` at the repo root.
+
+## Release process
+
+The build workflow runs automatically when a `v*` tag is pushed:
+
+```bash
+# Bump src/manifest.json "version" first, then:
+git commit -am "[update] bump to v2.1.0"
+git tag v2.1.0
+git push origin main --tags
+```
+
+The workflow validates the tag matches the manifest version, builds the zip, and creates a GitHub Release with the zip attached. If a `CRX_PRIVATE_KEY` secret is configured, a signed `.crx` is attached as well.
 
 ## Project layout
 
@@ -42,6 +76,10 @@ src/
 ├── popup.js            Popup logic
 └── icons/              Toolbar & store icons
 ```
+
+## Privacy
+
+See [PRIVACY.md](./PRIVACY.md). TL;DR: no data ever leaves your device.
 
 ## Icon credits
 
