@@ -1,6 +1,6 @@
 {
   "name": "Let's Copy",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "manifest_version": 3,
   "description": "Unlock copy, text selection, and right-click on websites that disable them.",
   "homepage_url": "https://github.com/NatLee/lets-copy",
