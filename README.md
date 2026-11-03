@@ -10,6 +10,7 @@
   <a href="https://chromewebstore.google.com/detail/lets-copy/ggibadcfmilllfefhfbpifbamabehfdd"><img src="https://img.shields.io/chrome-web-store/v/ggibadcfmilllfefhfbpifbamabehfdd?label=Chrome%20Web%20Store" alt="Chrome Web Store version"></a>
   <a href="https://chromewebstore.google.com/detail/lets-copy/ggibadcfmilllfefhfbpifbamabehfdd"><img src="https://img.shields.io/chrome-web-store/users/ggibadcfmilllfefhfbpifbamabehfdd" alt="Chrome Web Store users"></a>
   <a href="https://github.com/NatLee/lets-copy/releases/latest"><img src="https://img.shields.io/github/v/release/NatLee/lets-copy?display_name=tag&sort=semver" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/NatLee/lets-copy" alt="License: MIT"></a>
 </p>
 
 Let's Copy is a browser extension for Chrome and Edge that gives you back text selection, copy and
@@ -50,10 +51,15 @@ Click the Let's Copy button in the toolbar (pin it from the puzzle-piece menu if
 - **Reload** appears while a site is on. A few sites install their blockers before Let's Copy can get
   in front of them. On those, right-click starts working after one reload, and from then on every
   visit is unlocked from the start.
+- **Unblock Ctrl+C / ⌘C** appears while a site is on, and is off by default. Switch it on for sites
+  that cancel the copy shortcut itself: the page then never sees Ctrl+C (⌘C on a Mac), so the browser
+  copies as usual. It's per site, because web apps with their own Ctrl+C (editors, spreadsheets) need
+  to see it. It takes effect straight away, without a reload.
 - **Always on** unlocks every site you visit. While it's on, the per-site switch and the shortcut do
   nothing, because there is nothing to switch.
-- **Active sites** lists the sites you've turned on. Hover over one and click × to remove it. *Clear
-  all* asks for a second click, then forgets every site and turns Always on off.
+- **Active sites** lists the sites you've turned on. Hover over one and click × to remove it (that
+  also forgets its Ctrl+C setting). *Clear all* asks for a second click, then forgets every site and
+  every setting, and turns Always on off.
 
 ## How it works
 
@@ -74,7 +80,8 @@ them. Let's Copy deals with all three ([`src/enable.js`](src/enable.js)):
 2. The script listens for `contextmenu`, `selectstart`, `copy`, `cut`, `paste`, `dragstart` (and the
    right mouse button) on `window`, in the capture phase. That is the first stop of every event, so it
    can stop the event before any of the page's listeners see it. The browser then does what it
-   normally does: shows the menu, copies the text, starts the selection.
+   normally does: shows the menu, copies the text, starts the selection. On sites where you switch on
+   *Unblock Ctrl+C / ⌘C*, the copy shortcut's `keydown` is one more event on that list.
 3. It adds a stylesheet that sets `user-select: auto !important` on everything. It also removes inline
    blockers (`oncontextmenu`, `oncopy`, `onselectstart`, `onmousedown`, `unselectable`, …), including on
    elements the page adds later.
@@ -86,15 +93,16 @@ On csdn.net it also switches on `designMode`, which makes CSDN's code blocks sel
 - **The page's own copy and paste handling is skipped too.** While a site is on, its `copy`, `cut` and
   `paste` listeners never run, including useful ones such as pasting an image into a chat box. If a web
   app misbehaves, turn Let's Copy off for that site, or turn off Always on.
-- **Ctrl+C blocked on the keyboard isn't undone.** Some sites cancel the `Ctrl+C` key press itself. On
-  those, select the text and use **Copy** from the right-click menu.
+- **Ctrl+C blocked on the keyboard needs the extra switch.** Some sites cancel the `Ctrl+C` key press
+  itself. Switch on *Unblock Ctrl+C / ⌘C* for those sites, or use **Copy** from the right-click menu.
+  While the switch is on, the site's own Ctrl+C handling doesn't run either.
 - **Turning a site off reloads it.** The unlock can't be undone in a page that's already open.
 
 ## Permissions
 
 | Permission | What it is for |
 |---|---|
-| `storage` | Remembers the sites you turned on and whether Always on is set, in your browser profile. |
+| `storage` | Remembers the sites you turned on, where Ctrl+C is unblocked, and whether Always on is set, in your browser profile. |
 | `scripting` | Runs the unlock script on the sites you turned on. |
 | Access to all websites (`<all_urls>`) | Lets the unlock script run on whichever site you pick, and lets the popup show which site the current tab is on. |
 
@@ -123,13 +131,14 @@ The Validate workflow runs both on every pull request.
 To try the unlock by hand, serve the demo page and open it with the unpacked extension loaded:
 
 ```bash
-node docs/images/src/screenshots.mjs --serve     # http://localhost:18006/
+npm run demo     # http://localhost:18006/
 ```
 
-[`docs/images/src/demo-page.html`](docs/images/src/demo-page.html) blocks copying in seven common
-ways; the comment at its top lists them. Without the `--serve` flag, the same script loads the
-extension in Edge and retakes the README screenshots. `hero.html` and `how-it-works.html` are rendered
-with a headless browser; the command is in each file's header.
+[`test/fixtures/demo-page.html`](test/fixtures/demo-page.html) blocks copying in seven common ways;
+the comment at its top lists them. `node docs/images/src/screenshots.mjs` serves the same page, loads
+the extension in Edge or Chrome (whichever is installed; set `BROWSER` to pick one) and retakes the
+README screenshots. `hero.html` and `how-it-works.html` are rendered with a headless browser; the
+command is in each file's header.
 
 ```
 src/
@@ -141,8 +150,9 @@ src/
 ├── popup.js        popup logic
 └── icons/          toolbar and store icons (check mark = on, copy symbol = off)
 test/               node:test tests (fake-chrome.js is the chrome.* stand-in)
-scripts/            check-extension.js, behind `npm run check`
-docs/images/src/    sources for the README images and the demo page
+test/fixtures/      demo-page.html, the copy-protected page used by tests, demo and screenshots
+scripts/            check-extension.js (policy: extension-policy.json), demo-server.mjs, lib/browser.mjs
+docs/images/src/    sources for the README images
 ```
 
 ### Packaging and releases
@@ -156,6 +166,10 @@ an annotated `vX.Y.Z` tag. The [build workflow](.github/workflows/build.yml) che
 matches the manifest, runs the tests, builds the ZIP, and creates a GitHub Release with it attached.
 If a `CRX_PRIVATE_KEY` secret is set, it attaches a signed `.crx` too. Upload the ZIP in the
 [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole) to ship it.
+
+## License
+
+[MIT](LICENSE). The toolbar icons are from Flaticon (below) and come under Flaticon's own license.
 
 ## Icon credits
 

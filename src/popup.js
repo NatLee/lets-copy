@@ -13,7 +13,11 @@ const els = {
   count: document.getElementById("count"),
   clearAll: document.getElementById("clear-all"),
   version: document.getElementById("version"),
+  options: document.querySelectorAll("[data-option]"),
 };
+
+// The site the popup last showed, for the per-site option switches.
+let currentHost = null;
 
 const FALLBACK_FAVICON =
   "data:image/svg+xml;utf8," +
@@ -36,6 +40,8 @@ function render(state) {
 
   // Hero — current site
   const host = state.host;
+  currentHost = host;
+  for (const input of els.options) input.checked = !!state.options?.[input.dataset.option];
   if (host) {
     els.hostname.textContent = host;
     // Use the icon the browser already has for the tab. Without one, show the
@@ -44,10 +50,9 @@ function render(state) {
     els.favicon.onerror = () => { els.favicon.src = FALLBACK_FAVICON; };
     els.favicon.src = state.favicon || FALLBACK_FAVICON;
     els.toggle.checked = !!state.currentEnabled;
-    // When Always-on is engaged, the per-site toggle is conceptually pinned —
-    // disabling it would only delete from the host list while always-on keeps
-    // unlocking. Lock the control and explain why.
-    els.toggle.disabled = !!state.alwaysOn;
+    // The worker decides whether this site's switch can be used (not while
+    // Always on is set); the popup only shows it and says why.
+    els.toggle.disabled = !state.canToggle;
     els.toggle.title = state.alwaysOn ? "Turn off Always-on to manage this site individually" : "Toggle for this site";
     if (state.currentEnabled) {
       els.hero.dataset.state = "on";
@@ -115,6 +120,13 @@ els.toggle.addEventListener("change", async () => {
   await refresh();
 });
 
+for (const input of els.options) {
+  input.addEventListener("change", async () => {
+    await send({ type: "setOption", host: currentHost, name: input.dataset.option, value: input.checked });
+    await refresh();
+  });
+}
+
 els.alwaysOn.addEventListener("change", async (e) => {
   await send({ type: "setAlwaysOn", value: e.target.checked });
   await refresh();
@@ -170,11 +182,10 @@ els.clearAll.addEventListener("click", async () => {
   await refresh();
 });
 
-// GitHub link: the href itself points at the project (manifest
-// homepage_url), so a middle-click or "open in new tab" lands there too.
+// GitHub link: its address is the manifest's homepage_url (the one place it
+// is written), set as the href so a middle-click or "open in new tab" works too.
 const repoLink = document.getElementById("repo-link");
-const homepage = chrome.runtime.getManifest().homepage_url;
-if (homepage) repoLink.href = homepage;
+repoLink.href = chrome.runtime.getManifest().homepage_url;
 repoLink.addEventListener("click", (e) => {
   e.preventDefault();
   chrome.tabs.create({ url: repoLink.href });

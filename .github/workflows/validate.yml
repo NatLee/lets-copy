@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
       # Background service worker against a fake chrome.* API (test/fake-chrome.js),
       # plus tests for the checker below.
@@ -41,3 +41,21 @@ jobs:
           if [ "$BASE_VERSION" = "$PR_VERSION" ]; then
             echo "::warning::manifest.json version unchanged ($PR_VERSION). Bump it before tagging a release."
           fi
+
+  e2e:
+    name: Unlock in a real browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # Loads src/ into the runner's Google Chrome (through the DevTools
+      # protocol, see scripts/lib/browser.mjs) and checks the demo page.
+      # The runner's sandbox restrictions need --no-sandbox.
+      - name: Browser tests
+        env:
+          BROWSER_ARGS: --no-sandbox
+        run: npm run test:e2e

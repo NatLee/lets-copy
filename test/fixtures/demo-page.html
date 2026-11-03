@@ -1,11 +1,11 @@
 <!doctype html>
 <!--
-  A page that blocks copying in the usual ways, for trying Let's Copy by hand and for the README
-  screenshots (screenshots.mjs serves it on port 18006). Blockers on this page:
+  A page that blocks copying in the usual ways, for the browser tests (test/e2e), for trying
+  Let's Copy by hand (npm run demo) and for the README screenshots. Blockers on this page:
     1. CSS user-select: none on <body> and on the code block
     2. inline oncontextmenu / onselectstart / oncopy / ondragstart="return false" on <body>
     3. addEventListener blockers for contextmenu (on window and document, capture phase),
-       selectstart and dragstart
+       right-button mousedown, selectstart and dragstart
     4. a copy handler that replaces what you copied with a notice
     5. Ctrl/Cmd+C, X and A cancelled on keydown (Let's Copy does NOT undo this one)
     6. onmousedown="return false" on one paragraph, which stops drag-selection there
@@ -29,10 +29,11 @@
   #late { color: #59636e; font-size: 14.5px; border-top: 1px solid #d1d9e0; padding-top: 12px; }
 </style>
 <script>
-  window.__pageSaw = { contextmenu: 0, contextmenuWindow: 0, selectstart: 0, copy: 0, keydownCopy: 0, mousedown: 0, dragstart: 0 };
+  window.__pageSaw = { contextmenu: 0, contextmenuWindow: 0, rightMousedown: 0, selectstart: 0, copy: 0, keydownCopy: 0, mousedown: 0, dragstart: 0 };
   window.__loadId = Math.random().toString(36).slice(2);
   window.addEventListener("contextmenu", (e) => { __pageSaw.contextmenuWindow++; e.preventDefault(); }, true);
   document.addEventListener("contextmenu", (e) => { __pageSaw.contextmenu++; e.preventDefault(); }, true);
+  document.addEventListener("mousedown", (e) => { if (e.button === 2) { __pageSaw.rightMousedown++; e.preventDefault(); } });
   document.addEventListener("selectstart", (e) => { __pageSaw.selectstart++; e.preventDefault(); });
   document.addEventListener("dragstart", (e) => { __pageSaw.dragstart++; e.preventDefault(); });
   document.addEventListener("copy", (e) => {

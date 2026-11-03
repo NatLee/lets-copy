@@ -1,6 +1,6 @@
 # Privacy Policy — Let's Copy
 
-**Effective date:** 2026-11-03
+**Effective date:** 2026-11-04
 
 ## TL;DR
 
@@ -16,6 +16,7 @@ The extension uses `chrome.storage.local` to remember:
 
 - The list of hostnames you have explicitly enabled (e.g. `example.com`)
 - Whether the **Always on** mode is active
+- The hostnames where you switched on **Unblock Ctrl+C / ⌘C**
 
 This data:
 
@@ -37,7 +38,7 @@ The extension only injects code into tabs whose hostname matches your enabled li
 
 None. The only image the popup loads from outside the extension is the current tab's own icon, from the address the browser already found for that site (usually served from the browser cache, and with `referrerpolicy="no-referrer"`). If the browser has no icon for the tab, the popup shows a built-in globe instead.
 
-Versions up to 2.1.0 asked Google's public favicon service (`https://www.google.com/s2/favicons?domain={hostname}`) for an icon in that case, which sent it the hostname of the current tab. That request was removed in the version after 2.1.0.
+Versions up to 2.1.0 asked Google's public favicon service (`https://www.google.com/s2/favicons?domain={hostname}`) for an icon in that case, which sent it the hostname of the current tab. That request was removed in 2.2.0.
 
 ## Analytics, telemetry, advertising
 
@@ -59,7 +60,7 @@ Questions or concerns: <https://github.com/NatLee/lets-copy/issues>
 
 # 隱私權政策 — Let's Copy
 
-**生效日期：** 2026-11-03
+**生效日期：** 2026-11-04
 
 ## 簡述
 
@@ -75,6 +76,7 @@ Let's Copy 用於解除網站對複製、文字選取、右鍵選單的限制，
 
 - 使用者明確啟用過的網站主機名稱清單（例如 `example.com`）
 - **Always on** 模式是否啟用
+- 使用者開啟 **Unblock Ctrl+C / ⌘C** 的網站主機名稱
 
 這些資料：
 
@@ -96,7 +98,7 @@ Let's Copy 用於解除網站對複製、文字選取、右鍵選單的限制，
 
 無。Popup 唯一會從擴充功能以外載入的圖片，是當前分頁網站自己的圖示，網址是瀏覽器已經為該網站找到的那一個（通常直接從瀏覽器快取取得，並使用 `referrerpolicy="no-referrer"`）。如果瀏覽器沒有這個分頁的圖示，popup 會改用內建的地球圖示。
 
-2.1.0 以前的版本在這種情況下會向 Google 的公開 favicon 服務（`https://www.google.com/s2/favicons?domain={hostname}`）要圖示，請求中會帶有當前分頁的主機名稱。2.1.0 之後的版本已移除這個請求。
+2.1.0 以前的版本在這種情況下會向 Google 的公開 favicon 服務（`https://www.google.com/s2/favicons?domain={hostname}`）要圖示，請求中會帶有當前分頁的主機名稱。2.2.0 起已移除這個請求。
 
 ## 分析、遙測、廣告
 
