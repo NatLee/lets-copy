@@ -29,8 +29,7 @@ This data:
 | --- | --- |
 | `storage` | Save your per-site preferences locally |
 | `scripting` | Inject the unlock script into pages on your enabled list |
-| `tabs` | Read the active tab's URL to know which site you are on |
-| `host_permissions: <all_urls>` | Required so the unlock script can run on any site you choose to enable |
+| `host_permissions: <all_urls>` | Required so the unlock script can run on any site you choose to enable, and so the popup can see which site the current tab is on |
 
 The extension only injects code into tabs whose hostname matches your enabled list (or every tab, if you turn on **Always on**).
 
@@ -100,8 +99,7 @@ Let's Copy 用於解除網站對複製、文字選取、右鍵選單的限制，
 | --- | --- |
 | `storage` | 在本機儲存使用者偏好 |
 | `scripting` | 將解鎖腳本注入至已啟用清單上的頁面 |
-| `tabs` | 讀取當前分頁網址，以辨識所在站台 |
-| `host_permissions: <all_urls>` | 允許在任何使用者選擇啟用的站台上注入腳本 |
+| `host_permissions: <all_urls>` | 允許在任何使用者選擇啟用的站台上注入腳本，並讓 popup 知道目前分頁所在的站台 |
 
 擴充功能只會將腳本注入主機名稱符合已啟用清單的分頁；若開啟 **Always on**，則套用到所有分頁。
 

@@ -51,6 +51,14 @@ test("fails on a permission nobody signed off on", () => {
     assert.match(r.out, /unexpected permission "cookies"/);
 });
 
+// The tabs permission was dropped: <all_urls> already lets the worker read
+// the current tab's address and icon. It shouldn't creep back in.
+test("fails if the tabs permission comes back", () => {
+    const r = check((d) => editManifest(d, (m) => ({ ...m, permissions: [...m.permissions, "tabs"] })));
+    assert.equal(r.code, 1);
+    assert.match(r.out, /unexpected permission "tabs"/);
+});
+
 test("fails on Manifest V2", () => {
     const r = check((d) => editManifest(d, (m) => ({ ...m, manifest_version: 2 })));
     assert.equal(r.code, 1);

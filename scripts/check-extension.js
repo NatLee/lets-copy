@@ -14,7 +14,7 @@ import vm from "node:vm";
 
 // Changing what the extension may access changes the install prompt users
 // see, so it should be a deliberate edit here, not a side effect.
-const ALLOWED_PERMISSIONS = ["storage", "scripting", "tabs"];
+const ALLOWED_PERMISSIONS = ["storage", "scripting"];
 const ALLOWED_HOST_PERMISSIONS = ["<all_urls>"];
 
 const srcDir = path.resolve(process.argv[2] || "src");
