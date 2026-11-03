@@ -81,3 +81,12 @@ test("fails on a syntax error", () => {
     assert.equal(r.code, 1);
     assert.match(r.out, /enable\.js has a syntax error/);
 });
+
+// Regression: the popup asked Google's favicon service for an icon, sending
+// it the hostname of the current tab. A new third-party host must be a
+// deliberate change.
+test("fails when the code talks to a host that isn't on the list", () => {
+    const r = check((d) => edit(d, "popup.js", (s) => s + "\nconst x = `https://www.google.com/s2/favicons?domain=${host}`;\n"));
+    assert.equal(r.code, 1);
+    assert.match(r.out, /popup\.js refers to www\.google\.com/);
+});

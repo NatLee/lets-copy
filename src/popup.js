@@ -38,8 +38,11 @@ function render(state) {
   const host = state.host;
   if (host) {
     els.hostname.textContent = host;
-    els.favicon.src = state.favicon || `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
+    // Use the icon the browser already has for the tab. Without one, show the
+    // built-in globe rather than asking a favicon service, which would tell
+    // that service which site you're on.
     els.favicon.onerror = () => { els.favicon.src = FALLBACK_FAVICON; };
+    els.favicon.src = state.favicon || FALLBACK_FAVICON;
     els.toggle.checked = !!state.currentEnabled;
     // When Always-on is engaged, the per-site toggle is conceptually pinned —
     // disabling it would only delete from the host list while always-on keeps

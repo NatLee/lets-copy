@@ -16,6 +16,9 @@ import vm from "node:vm";
 // see, so it should be a deliberate edit here, not a side effect.
 const ALLOWED_PERMISSIONS = ["storage", "scripting"];
 const ALLOWED_HOST_PERMISSIONS = ["<all_urls>"];
+// Hosts the code may mention. Anything else would be a new third party the
+// privacy policy has to name. (www.w3.org is only the SVG XML namespace.)
+const ALLOWED_REMOTE_HOSTS = ["www.w3.org", "github.com"];
 
 const srcDir = path.resolve(process.argv[2] || "src");
 const errors = [];
@@ -117,6 +120,16 @@ for (const file of files.filter((f) => f.endsWith(".js"))) {
     }
     for (const m of js.matchAll(/["']((?:[\w-]+\/)*[\w.-]+\.(?:js|png|html))["']/g)) {
         if (!/^https?:/.test(m[1])) mustExist(file, m[1], srcDir);
+    }
+}
+
+// 4. No new third parties: every http(s) URL in the code must be on a known host.
+for (const file of files.filter((f) => /\.(js|html|css|json)$/.test(f))) {
+    for (const m of readFileSync(file, "utf8").matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) {
+        const host = m[1].toLowerCase();
+        if (!ALLOWED_REMOTE_HOSTS.includes(host)) {
+            fail(`${rel(file)} refers to ${host} (add it to ALLOWED_REMOTE_HOSTS and PRIVACY.md if intended)`);
+        }
     }
 }
 
