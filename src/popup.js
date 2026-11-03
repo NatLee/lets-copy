@@ -169,11 +169,10 @@ els.clearAll.addEventListener("click", async () => {
   await refresh();
 });
 
-// GitHub link: the href itself points at the project (manifest
-// homepage_url), so a middle-click or "open in new tab" lands there too.
+// GitHub link: its address is the manifest's homepage_url (the one place it
+// is written), set as the href so a middle-click or "open in new tab" works too.
 const repoLink = document.getElementById("repo-link");
-const homepage = chrome.runtime.getManifest().homepage_url;
-if (homepage) repoLink.href = homepage;
+repoLink.href = chrome.runtime.getManifest().homepage_url;
 repoLink.addEventListener("click", (e) => {
   e.preventDefault();
   chrome.tabs.create({ url: repoLink.href });
