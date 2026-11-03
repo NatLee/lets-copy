@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
-  A page that blocks copying in the usual ways, for trying Let's Copy by hand and for the README
-  screenshots (screenshots.mjs serves it on port 18006). Blockers on this page:
+  A page that blocks copying in the usual ways, for the browser tests (test/e2e), for trying
+  Let's Copy by hand (npm run demo) and for the README screenshots. Blockers on this page:
     1. CSS user-select: none on <body> and on the code block
     2. inline oncontextmenu / onselectstart / oncopy / ondragstart="return false" on <body>
     3. addEventListener blockers for contextmenu (on window and document, capture phase),

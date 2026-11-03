@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "check": "node scripts/check-extension.js"
+    "check": "node scripts/check-extension.js",
+    "demo": "node scripts/demo-server.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -123,13 +123,14 @@ The Validate workflow runs both on every pull request.
 To try the unlock by hand, serve the demo page and open it with the unpacked extension loaded:
 
 ```bash
-node docs/images/src/screenshots.mjs --serve     # http://localhost:18006/
+npm run demo     # http://localhost:18006/
 ```
 
-[`docs/images/src/demo-page.html`](docs/images/src/demo-page.html) blocks copying in seven common
-ways; the comment at its top lists them. Without the `--serve` flag, the same script loads the
-extension in Edge and retakes the README screenshots. `hero.html` and `how-it-works.html` are rendered
-with a headless browser; the command is in each file's header.
+[`test/fixtures/demo-page.html`](test/fixtures/demo-page.html) blocks copying in seven common ways;
+the comment at its top lists them. `node docs/images/src/screenshots.mjs` serves the same page, loads
+the extension in Edge or Chrome (whichever is installed; set `BROWSER` to pick one) and retakes the
+README screenshots. `hero.html` and `how-it-works.html` are rendered with a headless browser; the
+command is in each file's header.
 
 ```
 src/
@@ -141,8 +142,9 @@ src/
 ├── popup.js        popup logic
 └── icons/          toolbar and store icons (check mark = on, copy symbol = off)
 test/               node:test tests (fake-chrome.js is the chrome.* stand-in)
-scripts/            check-extension.js, behind `npm run check`
-docs/images/src/    sources for the README images and the demo page
+test/fixtures/      demo-page.html, the copy-protected page used by tests, demo and screenshots
+scripts/            check-extension.js (policy: extension-policy.json), demo-server.mjs, lib/browser.mjs
+docs/images/src/    sources for the README images
 ```
 
 ### Packaging and releases
