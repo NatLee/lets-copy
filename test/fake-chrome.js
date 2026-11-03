@@ -53,7 +53,8 @@ export function loadBackground({ stored = {}, tabs } = {}) {
                 return [...registered.values()].map(clone);
             },
             async executeScript(opts) {
-                log.executeScript.push(clone(opts));
+                // A function can't be cloned; keep its name next to its arguments.
+                log.executeScript.push({ ...clone(opts), ...(opts.func ? { func: opts.func.name } : {}) });
                 return [];
             },
         },
@@ -63,7 +64,12 @@ export function loadBackground({ stored = {}, tabs } = {}) {
             async setBadgeBackgroundColor() {},
         },
         tabs: {
-            async query() { return openTabs.filter((t) => t.active).map(clone); },
+            // { url: "*://host/*" } finds the tabs on that host; anything else, the active tab.
+            async query(q = {}) {
+                const host = q.url && /^\*:\/\/([^/]+)\/\*$/.exec(q.url)?.[1];
+                const hits = host ? openTabs.filter((t) => { try { return new URL(t.url).hostname === host; } catch { return false; } }) : openTabs.filter((t) => t.active);
+                return hits.map(clone);
+            },
             async get(id) { return clone(openTabs.find((t) => t.id === id)); },
             async reload(id) { log.reload.push(id); },
             onActivated: event("activated"),

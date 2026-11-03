@@ -18,15 +18,15 @@ const HOSTS = { site: "blog.example.com", other: "news.example.net", unlisted: "
 const url = (host) => `http://${host}:${DEMO_PORT}/`;
 const TIMEOUT = { timeout: 60000 };
 
-let server, browser, worker, page;
+let server, browser, extId, worker, page;
 
 before(async () => {
     server = await serveDemo();
     browser = await launchBrowser({
         args: [`--host-resolver-rules=${Object.values(HOSTS).map((h) => `MAP ${h} 127.0.0.1`).join(", ")}`],
     });
-    const id = await browser.loadExtension(ext);
-    worker = await browser.extensionWorker(id);
+    extId = await browser.loadExtension(ext);
+    worker = await browser.extensionWorker(extId);
     page = await browser.newPage();
     await page.send("Emulation.setDeviceMetricsOverride", { width: 900, height: 700, deviceScaleFactor: 1, mobile: false });
     // Trusted mouse and key events only reach a focused, painted page; a fresh
@@ -154,4 +154,53 @@ test("Always on unlocks a site that was never switched on", TIMEOUT, async () =>
     await open(HOSTS.unlisted);
     assert.deepEqual(await blockers(), UNLOCKED);
     await setStorage({ alwaysOn: false });
+});
+
+// ── The per-site "Unblock Ctrl+C / ⌘C" option ───────────────────────────────
+
+/** The real popup, in a background tab: the demo page stays the active tab, so it is what the popup shows. */
+async function openPopupFor(host) {
+    const popup = await browser.newPage({ url: `chrome-extension://${extId}/popup.html`, background: true });
+    await popup.waitFor(`document.getElementById("hostname").textContent === ${JSON.stringify(host)}`, { what: "the popup" });
+    return popup;
+}
+const OPTION = '[data-option="copyShortcut"]';
+
+test("an unlocked site still sees Ctrl+C until its option is switched on", TIMEOUT, async () => {
+    await setStorage({ enabledHosts: [HOSTS.site, HOSTS.other], alwaysOn: false, copyShortcutHosts: [] });
+    await open(HOSTS.site);
+    assert.equal(await ctrlCReachesPage(), true);
+    const popup = await openPopupFor(HOSTS.site);
+    assert.equal(await popup.evaluate(`getComputedStyle(document.querySelector(".hero-option")).display`), "flex");
+    assert.equal(await popup.evaluate(`document.querySelector('${OPTION}').checked`), false);
+    await popup.close();
+});
+
+test("switching the option on in the popup hides Ctrl+C from the page at once and after reloads", TIMEOUT, async () => {
+    await open(HOSTS.site);
+    const popup = await openPopupFor(HOSTS.site);
+    await popup.evaluate(`document.querySelector('${OPTION}').click()`);
+    await popup.waitFor(`document.querySelector('${OPTION}').checked`, { what: "the switch" });
+    await popup.close();
+    await page.waitFor("window.__letsCopyOptions?.copyShortcut === true", { what: "the option on the open page" });
+    assert.deepEqual(await blockers(), { ...UNLOCKED, copyKey: false });
+    await open(HOSTS.site); // a new visit gets it from the registered scripts
+    assert.deepEqual(await blockers(), { ...UNLOCKED, copyKey: false });
+});
+
+test("another unlocked site keeps its own setting", TIMEOUT, async () => {
+    await open(HOSTS.other);
+    assert.deepEqual(await blockers(), UNLOCKED);
+});
+
+test("switching the option off gives the page its Ctrl+C back without a reload", TIMEOUT, async () => {
+    await open(HOSTS.site);
+    const loadId = await page.evaluate("__loadId");
+    const popup = await openPopupFor(HOSTS.site);
+    await popup.evaluate(`document.querySelector('${OPTION}').click()`);
+    await popup.waitFor(`!document.querySelector('${OPTION}').checked`, { what: "the switch" });
+    await popup.close();
+    await page.waitFor("window.__letsCopyOptions?.copyShortcut === false", { what: "the option on the open page" });
+    assert.equal(await page.evaluate("__loadId"), loadId);
+    assert.deepEqual(await blockers(), UNLOCKED);
 });

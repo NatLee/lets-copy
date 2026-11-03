@@ -13,7 +13,11 @@ const els = {
   count: document.getElementById("count"),
   clearAll: document.getElementById("clear-all"),
   version: document.getElementById("version"),
+  options: document.querySelectorAll("[data-option]"),
 };
+
+// The site the popup last showed, for the per-site option switches.
+let currentHost = null;
 
 const FALLBACK_FAVICON =
   "data:image/svg+xml;utf8," +
@@ -36,6 +40,8 @@ function render(state) {
 
   // Hero — current site
   const host = state.host;
+  currentHost = host;
+  for (const input of els.options) input.checked = !!state.options?.[input.dataset.option];
   if (host) {
     els.hostname.textContent = host;
     // Use the icon the browser already has for the tab. Without one, show the
@@ -113,6 +119,13 @@ els.toggle.addEventListener("change", async () => {
   await send({ type: "toggleCurrent" });
   await refresh();
 });
+
+for (const input of els.options) {
+  input.addEventListener("change", async () => {
+    await send({ type: "setOption", host: currentHost, name: input.dataset.option, value: input.checked });
+    await refresh();
+  });
+}
 
 els.alwaysOn.addEventListener("change", async (e) => {
   await send({ type: "setAlwaysOn", value: e.target.checked });

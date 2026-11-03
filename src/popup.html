@@ -48,6 +48,17 @@
             Reload
           </button>
         </div>
+        <!-- Per-site options: each input names one option (OPTIONS in background.js). -->
+        <div class="hero-option">
+          <div class="hero-option-text">
+            <div class="hero-option-title">Unblock Ctrl+C / ⌘C</div>
+            <div class="hero-option-desc">For sites that cancel the copy shortcut. Off by default: some web apps need their own Ctrl+C.</div>
+          </div>
+          <label class="switch small" title="Keep this site from seeing the copy shortcut">
+            <input type="checkbox" data-option="copyShortcut">
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
       </section>
 
       <!-- Features -->
@@ -69,6 +80,10 @@
           <li>
             <svg viewBox="0 0 24 24" class="check"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Drag-start image protection
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" class="check"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Ctrl+C / ⌘C, if you switch it on for a site
           </li>
         </ul>
       </section>

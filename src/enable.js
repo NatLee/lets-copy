@@ -19,10 +19,16 @@
   window.__letsCopyActive = true;
 
   // What the page's own handlers must not see. Each rule names an event type
-  // and, optionally, `when` (only some of those events). `selectionchange` is
+  // and, optionally, `when` (only some of those events) and `option` (only on
+  // sites where that option is switched on). `selectionchange` is
   // intentionally absent: it fires AFTER selection happens and isn't
   // preventable, so stopping it would only break legitimate selection UI.
   const isRightButton = (e) => e.button === 2;
+  // Ctrl+C, or ⌘C on macOS. `key` follows the keyboard layout; keyCode 67 is
+  // the C key the browser's own copy shortcut uses, also on layouts where that
+  // key types another letter (Cyrillic, Greek...).
+  const isCopyShortcut = (e) =>
+    (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (String(e.key).toLowerCase() === "c" || e.keyCode === 67);
   const RULES = [
     { type: "contextmenu" },
     { type: "selectstart" },
@@ -37,7 +43,16 @@
     // menu. Only the right button, so left-click selection still reaches them.
     { type: "mousedown", when: isRightButton },
     { type: "mouseup", when: isRightButton },
+    // Pages that cancel the copy shortcut itself. Opt-in per site: web apps
+    // with their own Ctrl+C handling (editors, spreadsheets) need to see it.
+    { type: "keydown", when: isCopyShortcut, option: "copyShortcut" },
   ];
+
+  // Per-site options, put on the page by the worker before this script runs
+  // and again whenever they change. Read when an event arrives, so a change
+  // applies to an open page straight away.
+  const optionOn = (name) => !!globalThis.__letsCopyOptions?.[name];
+  const applies = (rule, e) => (!rule.option || optionOn(rule.option)) && (!rule.when || rule.when(e));
 
   const INLINE_ATTRS = [
     "oncontextmenu",
@@ -64,7 +79,7 @@
     rulesByType.get(rule.type).push(rule);
   }
   const swallow = (e) => {
-    if (rulesByType.get(e.type).some((rule) => !rule.when || rule.when(e))) e.stopImmediatePropagation();
+    if (rulesByType.get(e.type).some((rule) => applies(rule, e))) e.stopImmediatePropagation();
   };
   for (const type of rulesByType.keys()) window.addEventListener(type, swallow, { capture: true });
 

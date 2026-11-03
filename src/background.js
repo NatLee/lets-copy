@@ -1,10 +1,11 @@
 // Let's Copy — background service worker.
 //
 // Responsibilities:
-//   - Persist the list of hosts where copy-unlock is enabled.
+//   - Persist the list of hosts where copy-unlock is enabled, and the per-site
+//     options (OPTIONS).
 //   - Inject enable.js into the active tab when the user toggles ON.
-//   - Dynamically register a MAIN-world, document_start content script for each
-//     enabled host so that capture-phase event blockers run BEFORE the page's
+//   - Dynamically register MAIN-world, document_start content scripts for the
+//     enabled hosts so that capture-phase event blockers run BEFORE the page's
 //     own anti-copy handlers register. This is what fixes right-click locking.
 //   - Keep the toolbar icon/badge in sync with the current tab's state.
 
@@ -13,6 +14,17 @@ const STORAGE_KEYS = { hosts: "enabledHosts", alwaysOn: "alwaysOn" };
 const DYNAMIC_SCRIPT_ID = "letscopy-autoinject";
 // The page-side unlock, injected in the page's own JavaScript world.
 const UNLOCK_SCRIPT = "enable.js";
+
+// Per-site options. Each one is off until it is switched on for a site in the
+// popup, and enable.js reads it from globalThis.__letsCopyOptions. Registered
+// (document_start) content scripts can only be files, so `script` is a
+// one-line file that turns the option on ahead of enable.js; everywhere else
+// the worker hands the page its options directly (setPageOptions).
+const OPTIONS = {
+  // Keep the page from seeing Ctrl+C / ⌘C, for sites that cancel the shortcut.
+  copyShortcut: { storageKey: "copyShortcutHosts", script: "options/copy-shortcut.js" },
+};
+const OPTION_NAMES = Object.keys(OPTIONS);
 
 // Toolbar look per state. The icons come from the manifest: the extension's
 // own icons (check mark) mean "on", the action's default icons (the greyed
@@ -26,12 +38,16 @@ const UNLOCKABLE_PROTOCOLS = new Set(["http:", "https:"]);
 const state = {
   enabledHosts: new Set(),
   alwaysOn: false,
+  // option name -> hosts that have it on
+  options: Object.fromEntries(OPTION_NAMES.map((name) => [name, new Set()])),
 };
 
 async function loadState() {
-  const stored = await chrome.storage.local.get([STORAGE_KEYS.hosts, STORAGE_KEYS.alwaysOn]);
+  const optionKeys = OPTION_NAMES.map((name) => OPTIONS[name].storageKey);
+  const stored = await chrome.storage.local.get([STORAGE_KEYS.hosts, STORAGE_KEYS.alwaysOn, ...optionKeys]);
   state.enabledHosts = new Set(stored[STORAGE_KEYS.hosts] || []);
   state.alwaysOn = !!stored[STORAGE_KEYS.alwaysOn];
+  for (const name of OPTION_NAMES) state.options[name] = new Set(stored[OPTIONS[name].storageKey] || []);
   await syncDynamicScripts();
 }
 
@@ -39,6 +55,7 @@ async function saveState() {
   await chrome.storage.local.set({
     [STORAGE_KEYS.hosts]: [...state.enabledHosts],
     [STORAGE_KEYS.alwaysOn]: state.alwaysOn,
+    ...Object.fromEntries(OPTION_NAMES.map((name) => [OPTIONS[name].storageKey, [...state.options[name]]])),
   });
 }
 
@@ -62,22 +79,48 @@ function canToggle(host) {
   return !!host && !state.alwaysOn;
 }
 
+/** The options switched on for `host`, e.g. ["copyShortcut"]. */
+const optionsOn = (host) => OPTION_NAMES.filter((name) => state.options[name].has(host));
+/** Every option for `host` as true/false, e.g. { copyShortcut: false }. */
+const optionValues = (host) => Object.fromEntries(OPTION_NAMES.map((name) => [name, state.options[name].has(host)]));
+
 const matchPattern = (host) => `*://${host}/*`;
 
-// The content scripts that should be registered for the current state: they
-// run at document_start, before the page's own scripts.
-function wantedScripts() {
-  const matches = state.alwaysOn ? ["<all_urls>"] : [...state.enabledHosts].map(matchPattern);
-  if (matches.length === 0) return [];
-  return [{
-    id: DYNAMIC_SCRIPT_ID,
+function contentScript(optionNames, matches, excludeMatches = []) {
+  return {
+    id: [DYNAMIC_SCRIPT_ID, ...optionNames].join("-"),
     matches,
-    js: [UNLOCK_SCRIPT],
+    ...(excludeMatches.length ? { excludeMatches } : {}),
+    js: [...optionNames.map((name) => OPTIONS[name].script), UNLOCK_SCRIPT],
     runAt: "document_start",
     world: "MAIN",
     allFrames: true,
     persistAcrossSessions: true,
-  }];
+  };
+}
+
+// The content scripts that should be registered for the current state: they
+// run at document_start, before the page's own scripts. Sites are grouped by
+// the options they have on, one registration per group. With Always on, one
+// registration covers every site except those that have options.
+function wantedScripts() {
+  const groups = new Map(); // "copyShortcut" (or "") -> { names, hosts }
+  const unlocked = state.alwaysOn
+    ? new Set(OPTION_NAMES.flatMap((name) => [...state.options[name]]))
+    : state.enabledHosts;
+  for (const host of unlocked) {
+    const names = optionsOn(host);
+    const key = names.join("+");
+    if (!groups.has(key)) groups.set(key, { names, hosts: [] });
+    groups.get(key).hosts.push(host);
+  }
+  const scripts = [];
+  if (state.alwaysOn) {
+    const withOptions = [...groups.values()].flatMap((g) => g.hosts);
+    scripts.push(contentScript([], ["<all_urls>"], withOptions.map(matchPattern)));
+  }
+  for (const { names, hosts } of groups.values()) scripts.push(contentScript(names, hosts.map(matchPattern)));
+  return scripts;
 }
 
 // Replace our registrations with wantedScripts(). Calls are queued: the worker
@@ -96,18 +139,24 @@ function syncDynamicScripts() {
   return syncQueue;
 }
 
-async function injectNow(tabId) {
+// Runs in the page (MAIN world) through executeScript; must be self-contained.
+function setPageOptions(options) {
+  Object.assign((globalThis.__letsCopyOptions ||= {}), options);
+}
+
+async function inject(tabId, injection) {
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId, allFrames: true },
-      files: [UNLOCK_SCRIPT],
-      world: "MAIN",
-      injectImmediately: true,
-    });
+    await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", injectImmediately: true, ...injection });
   } catch (err) {
-    // Common cases: chrome:// pages, web store, etc. — silently ignore.
+    // Common cases: chrome:// pages, web store, a tab that just closed.
     console.debug("[Let's Copy] executeScript skipped:", err?.message);
   }
+}
+
+// Unlock a page that is already open: its options first, then the unlock.
+async function injectNow(tabId, host) {
+  await inject(tabId, { func: setPageOptions, args: [optionValues(host)] });
+  await inject(tabId, { files: [UNLOCK_SCRIPT] });
 }
 
 async function updateActionUI(tabId, host) {
@@ -128,11 +177,29 @@ async function enableHost(host) {
   await syncDynamicScripts();
 }
 
+// Removing a site forgets its options too.
 async function disableHost(host) {
   if (!host) return;
   state.enabledHosts.delete(host);
+  for (const name of OPTION_NAMES) state.options[name].delete(host);
   await saveState();
   await syncDynamicScripts();
+}
+
+// Switch an option for a site. Open tabs of that site get the change at
+// once; later visits get it from the registered scripts.
+async function setOption(host, name, value) {
+  if (!host || !OPTIONS[name]) return false;
+  if (value) state.options[name].add(host);
+  else state.options[name].delete(host);
+  await saveState();
+  await syncDynamicScripts();
+  if (isEnabledFor(host)) {
+    for (const tab of await chrome.tabs.query({ url: matchPattern(host) })) {
+      await inject(tab.id, { func: setPageOptions, args: [{ [name]: !!value }] });
+    }
+  }
+  return true;
 }
 
 async function getActiveTab() {
@@ -149,7 +216,7 @@ async function toggleCurrentTab() {
     await chrome.tabs.reload(tab.id);
   } else {
     await enableHost(host);
-    await injectNow(tab.id);
+    await injectNow(tab.id, host);
   }
   await updateActionUI(tab.id, host);
 }
@@ -198,6 +265,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           currentEnabled: isEnabledFor(host),
           injectable: !!host,
           canToggle: canToggle(host),
+          options: host ? optionValues(host) : {},
         });
         break;
       }
@@ -218,9 +286,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const tab = await getActiveTab();
         if (tab) {
           await updateActionUI(tab.id, hostOf(tab.url));
-          if (hostOf(tab.url) === msg.host) await injectNow(tab.id);
+          if (hostOf(tab.url) === msg.host) await injectNow(tab.id, msg.host);
         }
         sendResponse({ ok: true });
+        break;
+      }
+      case "setOption": {
+        const ok = await setOption(msg.host, msg.name, msg.value);
+        sendResponse(ok ? { ok: true } : { ok: false, error: "unknown option or site" });
         break;
       }
       case "setAlwaysOn": {
@@ -229,8 +302,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         await syncDynamicScripts();
         const tab = await getActiveTab();
         if (tab) {
-          await updateActionUI(tab.id, hostOf(tab.url));
-          if (state.alwaysOn) await injectNow(tab.id);
+          const host = hostOf(tab.url);
+          await updateActionUI(tab.id, host);
+          if (state.alwaysOn) await injectNow(tab.id, host);
         }
         sendResponse({ ok: true });
         break;
@@ -238,6 +312,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       case "clearAll": {
         state.enabledHosts.clear();
         state.alwaysOn = false;
+        for (const name of OPTION_NAMES) state.options[name].clear();
         await saveState();
         await syncDynamicScripts();
         const tab = await getActiveTab();
