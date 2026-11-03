@@ -48,7 +48,7 @@ test("fails when the script the worker injects is missing", () => {
 test("fails on a permission nobody signed off on", () => {
     const r = check((d) => editManifest(d, (m) => ({ ...m, permissions: [...m.permissions, "cookies"] })));
     assert.equal(r.code, 1);
-    assert.match(r.out, /unexpected permission "cookies"/);
+    assert.match(r.out, /permission "cookies" isn.t in extension-policy.json/);
 });
 
 // The tabs permission was dropped: <all_urls> already lets the worker read
@@ -56,7 +56,7 @@ test("fails on a permission nobody signed off on", () => {
 test("fails if the tabs permission comes back", () => {
     const r = check((d) => editManifest(d, (m) => ({ ...m, permissions: [...m.permissions, "tabs"] })));
     assert.equal(r.code, 1);
-    assert.match(r.out, /unexpected permission "tabs"/);
+    assert.match(r.out, /permission "tabs" isn.t in extension-policy.json/);
 });
 
 test("fails on Manifest V2", () => {
@@ -89,4 +89,31 @@ test("fails when the code talks to a host that isn't on the list", () => {
     const r = check((d) => edit(d, "popup.js", (s) => s + "\nconst x = `https://www.google.com/s2/favicons?domain=${host}`;\n"));
     assert.equal(r.code, 1);
     assert.match(r.out, /popup\.js refers to www\.google\.com/);
+});
+
+test("fails when an icon's pixel size isn't the size the manifest gives it", () => {
+    const r = check((d) => editManifest(d, (m) => ({ ...m, icons: { ...m.icons, 128: "icons/icon32.png" } })));
+    assert.equal(r.code, 1);
+    assert.match(r.out, /icons\/icon32\.png is listed as 128x128 but is 32x32/);
+});
+
+test("fails on a version the store rejects", () => {
+    for (const version of ["2.2.0.0.1", "2.02.0", "2.70000.0"]) {
+        const r = check((d) => editManifest(d, (m) => ({ ...m, version })));
+        assert.equal(r.code, 1, version);
+        assert.match(r.out, /version/);
+    }
+});
+
+// The old checker never syntax-checked ES modules.
+test("checks a module script as a module", () => {
+    const addModule = (code) => (d) => {
+        writeFileSync(path.join(d, "extra.js"), code);
+        edit(d, "popup.html", (s) => s.replace("</body>", '<script type="module" src="extra.js"></script></body>'));
+    };
+    const ok = check(addModule("export const x = 1;\n"));
+    assert.equal(ok.code, 0, ok.out);
+    const bad = check(addModule("export function (\n"));
+    assert.equal(bad.code, 1);
+    assert.match(bad.out, /extra\.js has a syntax error/);
 });

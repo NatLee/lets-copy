@@ -1,0 +1,6 @@
+{
+  "$comment": "What Let's Copy may use, enforced by scripts/check-extension.js. A permission changes the install prompt and a remote host must be named in PRIVACY.md, so change these lists on purpose. www.w3.org only appears as the SVG XML namespace.",
+  "permissions": ["storage", "scripting"],
+  "hostPermissions": ["<all_urls>"],
+  "remoteHosts": ["github.com", "www.w3.org"]
+}
