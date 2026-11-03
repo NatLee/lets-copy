@@ -2,6 +2,7 @@
 // can do on test/fixtures/demo-page.html, which blocks copying seven ways.
 //
 //   npm run test:e2e          (needs Edge, Chrome or Chromium; see scripts/lib/browser.mjs)
+//   EXTENSION_DIR=unzipped/ npm run test:e2e     (test a packaged build instead of src/)
 //
 // "The page's blocker ran" is measured with the page's own counters
 // (window.__pageSaw) and with cancelable events dispatched on the page.
@@ -13,7 +14,11 @@ import { fileURLToPath } from "node:url";
 import { launchBrowser } from "../../scripts/lib/browser.mjs";
 import { DEMO_PORT, serveDemo } from "../../scripts/demo-server.mjs";
 
-const ext = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "src");
+// src/ by default; EXTENSION_DIR points the tests at another unpacked copy,
+// e.g. the contents of the ZIP that goes to the Web Store.
+const ext = process.env.EXTENSION_DIR
+    ? path.resolve(process.env.EXTENSION_DIR)
+    : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "src");
 const HOSTS = { site: "blog.example.com", other: "news.example.net", unlisted: "wiki.example.org" };
 const url = (host) => `http://${host}:${DEMO_PORT}/`;
 const TIMEOUT = { timeout: 60000 };
@@ -158,10 +163,21 @@ test("Always on unlocks a site that was never switched on", TIMEOUT, async () =>
 
 // ── The per-site "Unblock Ctrl+C / ⌘C" option ───────────────────────────────
 
-/** The real popup, in a background tab: the demo page stays the active tab, so it is what the popup shows. */
+/**
+ * The real popup, in a background tab next to the demo page. The popup reports
+ * on the active tab, so make the demo page active first: other extensions in
+ * the browser profile may open tabs of their own (welcome pages) at any time.
+ */
 async function openPopupFor(host) {
+    await browser.send("Target.activateTarget", { targetId: page.targetId });
     const popup = await browser.newPage({ url: `chrome-extension://${extId}/popup.html`, background: true });
-    await popup.waitFor(`document.getElementById("hostname").textContent === ${JSON.stringify(host)}`, { what: "the popup" });
+    try {
+        await popup.waitFor(`document.getElementById("hostname").textContent === ${JSON.stringify(host)}`, { what: "the popup" });
+    } catch (err) {
+        const shown = await popup.evaluate('document.getElementById("hostname").textContent').catch(() => "?");
+        const active = await inWorker("getActiveTab().then((t) => t && t.url)").catch(() => "?");
+        throw new Error(`${err.message}: popup shows "${shown}", active tab ${active}`);
+    }
     return popup;
 }
 const OPTION = '[data-option="copyShortcut"]';
@@ -180,9 +196,11 @@ test("switching the option on in the popup hides Ctrl+C from the page at once an
     await open(HOSTS.site);
     const popup = await openPopupFor(HOSTS.site);
     await popup.evaluate(`document.querySelector('${OPTION}').click()`);
-    await popup.waitFor(`document.querySelector('${OPTION}').checked`, { what: "the switch" });
-    await popup.close();
+    // Keep the popup open until the page has the change: closing it early can
+    // drop the popup's message to the worker (a person's popup stays open too).
     await page.waitFor("window.__letsCopyOptions?.copyShortcut === true", { what: "the option on the open page" });
+    assert.equal(await popup.evaluate(`document.querySelector('${OPTION}').checked`), true);
+    await popup.close();
     assert.deepEqual(await blockers(), { ...UNLOCKED, copyKey: false });
     await open(HOSTS.site); // a new visit gets it from the registered scripts
     assert.deepEqual(await blockers(), { ...UNLOCKED, copyKey: false });
@@ -198,9 +216,9 @@ test("switching the option off gives the page its Ctrl+C back without a reload",
     const loadId = await page.evaluate("__loadId");
     const popup = await openPopupFor(HOSTS.site);
     await popup.evaluate(`document.querySelector('${OPTION}').click()`);
-    await popup.waitFor(`!document.querySelector('${OPTION}').checked`, { what: "the switch" });
-    await popup.close();
     await page.waitFor("window.__letsCopyOptions?.copyShortcut === false", { what: "the option on the open page" });
+    assert.equal(await popup.evaluate(`document.querySelector('${OPTION}').checked`), false);
+    await popup.close();
     assert.equal(await page.evaluate("__loadId"), loadId);
     assert.deepEqual(await blockers(), UNLOCKED);
 });

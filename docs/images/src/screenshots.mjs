@@ -60,6 +60,9 @@ try {
     // tab, so the popup shows its real state. (chrome.action.openPopup() works headless too,
     // but its window is too short to capture whole.) One fresh tab per colour scheme, set
     // before the page loads, so no theme transition is caught half-way.
+    // Other extensions in the profile may have opened tabs of their own; the
+    // popup reports on the active tab, so make the demo page active.
+    await browser.send("Target.activateTarget", { targetId: page.targetId });
     for (const scheme of SCHEMES) {
         const popup = await browser.newPage({ background: true });
         await popup.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
