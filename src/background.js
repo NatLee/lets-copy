@@ -11,6 +11,13 @@
 const STORAGE_KEYS = { hosts: "enabledHosts", alwaysOn: "alwaysOn" };
 const DYNAMIC_SCRIPT_ID = "letscopy-autoinject";
 
+// Toolbar look per state. The icons come from the manifest: the extension's
+// own icons (check mark) mean "on", the action's default icons (the greyed
+// copy symbol it starts with) mean "off".
+const MANIFEST = chrome.runtime.getManifest();
+const TOOLBAR_ICONS = { on: MANIFEST.icons, off: MANIFEST.action.default_icon };
+const BADGE = { text: "ON", color: "#10b981" };
+
 const state = {
   enabledHosts: new Set(),
   alwaysOn: false,
@@ -87,17 +94,12 @@ async function injectNow(tabId) {
 async function updateActionUI(tabId, host) {
   const on = isEnabledFor(host);
   try {
-    await chrome.action.setIcon({
-      tabId,
-      path: on
-        ? { 24: "icons/icon24.png", 32: "icons/icon32.png", 128: "icons/icon128.png" }
-        : { 24: "icons/icon24-disable.png", 32: "icons/icon32-disable.png", 128: "icons/icon128-disable.png" },
-    });
-    await chrome.action.setBadgeText({ tabId, text: on ? "ON" : "" });
-    if (on) {
-      await chrome.action.setBadgeBackgroundColor({ tabId, color: "#10b981" });
-    }
-  } catch {}
+    await chrome.action.setIcon({ tabId, path: on ? TOOLBAR_ICONS.on : TOOLBAR_ICONS.off });
+    await chrome.action.setBadgeText({ tabId, text: on ? BADGE.text : "" });
+    if (on) await chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE.color });
+  } catch {
+    // The tab was closed or navigated away while we were updating it.
+  }
 }
 
 async function enableHost(host) {

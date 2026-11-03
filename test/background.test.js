@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { loadBackground } from "./fake-chrome.js";
 
 const lastBadge = (bg) => bg.log.badge.at(-1);
@@ -129,6 +130,16 @@ test("Clear all turns Always on off and forgets every site", async () => {
     await bg.send({ type: "clearAll" });
     assert.deepEqual(bg.storage, { enabledHosts: [], alwaysOn: false });
     assert.deepEqual(bg.matches(), []);
+});
+
+test("the toolbar uses the manifest's icons: its own icons for on, the action's for off", async () => {
+    const manifest = JSON.parse(readFileSync(new URL("../src/manifest.json", import.meta.url), "utf8"));
+    const bg = loadBackground({ stored: { enabledHosts: ["example.com"] } });
+    await bg.ready();
+    await bg.tabUpdated(1, { status: "complete" }, { id: 1, url: "https://example.com/" });
+    assert.deepEqual(bg.log.icon.at(-1).path, manifest.icons);
+    await bg.tabUpdated(2, { status: "complete" }, { id: 2, url: "https://elsewhere.example/" });
+    assert.deepEqual(bg.log.icon.at(-1).path, manifest.action.default_icon);
 });
 
 test("the toolbar icon follows the tab's site", async () => {
