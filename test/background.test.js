@@ -75,6 +75,19 @@ test("Always on registers one script for every site and unlocks the open page", 
     assert.equal(state.currentEnabled, true);
 });
 
+// Regression: in Always-on mode the shortcut "switched off" a site that was
+// never in the list, so it reloaded the page (losing anything typed into it)
+// and the site stayed unlocked anyway.
+test("the keyboard shortcut does nothing while Always on is set", async () => {
+    const bg = loadBackground({ stored: { enabledHosts: [], alwaysOn: true } });
+    await bg.ready();
+    await bg.command("toggle-current-site");
+
+    assert.deepEqual(bg.log.reload, []);
+    assert.deepEqual(bg.storage.enabledHosts, []);
+    assert.deepEqual(bg.matches(), ["<all_urls>"]);
+});
+
 test("the keyboard shortcut toggles the current site", async () => {
     const bg = loadBackground();
     await bg.ready();

@@ -120,6 +120,11 @@ async function getActiveTab() {
 }
 
 async function toggleCurrentTab() {
+  // Always on has no per-site exceptions, so there is nothing to switch here.
+  // The popup greys its switch out; the shortcut used to "switch off" a host
+  // that was never in the list, which just reloaded the page (losing any
+  // unsaved input) and left it unlocked.
+  if (state.alwaysOn) return;
   const tab = await getActiveTab();
   if (!tab) return;
   const host = hostOf(tab.url);
