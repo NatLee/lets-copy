@@ -10,6 +10,7 @@
   <a href="https://chromewebstore.google.com/detail/lets-copy/ggibadcfmilllfefhfbpifbamabehfdd"><img src="https://img.shields.io/chrome-web-store/v/ggibadcfmilllfefhfbpifbamabehfdd?label=Chrome%20Web%20Store" alt="Chrome Web Store version"></a>
   <a href="https://chromewebstore.google.com/detail/lets-copy/ggibadcfmilllfefhfbpifbamabehfdd"><img src="https://img.shields.io/chrome-web-store/users/ggibadcfmilllfefhfbpifbamabehfdd" alt="Chrome Web Store users"></a>
   <a href="https://github.com/NatLee/lets-copy/releases/latest"><img src="https://img.shields.io/github/v/release/NatLee/lets-copy?display_name=tag&sort=semver" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/NatLee/lets-copy" alt="License: MIT"></a>
 </p>
 
 Let's Copy is a browser extension for Chrome and Edge that gives you back text selection, copy and
@@ -158,6 +159,10 @@ an annotated `vX.Y.Z` tag. The [build workflow](.github/workflows/build.yml) che
 matches the manifest, runs the tests, builds the ZIP, and creates a GitHub Release with it attached.
 If a `CRX_PRIVATE_KEY` secret is set, it attaches a signed `.crx` too. Upload the ZIP in the
 [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole) to ship it.
+
+## License
+
+[MIT](LICENSE). The toolbar icons are from Flaticon (below) and come under Flaticon's own license.
 
 ## Icon credits
 
