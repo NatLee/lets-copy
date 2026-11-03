@@ -1,0 +1,74 @@
+<!doctype html>
+<!--
+  A page that blocks copying in the usual ways, for trying Let's Copy by hand and for the README
+  screenshots (screenshots.mjs serves it on port 18006). Blockers on this page:
+    1. CSS user-select: none on <body> and on the code block
+    2. inline oncontextmenu / onselectstart / oncopy / ondragstart="return false" on <body>
+    3. addEventListener blockers for contextmenu (on window and document, capture phase),
+       selectstart and dragstart
+    4. a copy handler that replaces what you copied with a notice
+    5. Ctrl/Cmd+C, X and A cancelled on keydown (Let's Copy does NOT undo this one)
+    6. onmousedown="return false" on one paragraph, which stops drag-selection there
+    7. a paragraph added a second after load with its own oncopy and user-select: none
+  window.__pageSaw counts how often each blocker ran.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reading config files in Python · Example Blog</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230969da'/%3E%3Cpath d='M11 9h6.5a4 4 0 0 1 0 8H11zm0 8h7.5a4 4 0 0 1 0 8H11z' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  body { -webkit-user-select: none; user-select: none; font: 16px/1.65 "Segoe UI", system-ui, sans-serif; margin: 0; background: #ffffff; color: #1f2328; }
+  header.site { border-bottom: 1px solid #d1d9e0; padding: 14px 28px; font-weight: 700; font-size: 15px; display: flex; gap: 10px; align-items: center; }
+  header.site i { width: 22px; height: 22px; border-radius: 6px; background: #0969da; display: inline-block; }
+  main { max-width: 720px; margin: 0 auto; padding: 26px 28px 40px; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.015em; line-height: 1.25; }
+  .meta { color: #59636e; font-size: 13.5px; margin-bottom: 14px; }
+  .notice { display: inline-block; font-size: 12px; font-weight: 600; color: #cf222e; background: #ffebe9; border: 1px solid #ffcecb; padding: 3px 10px; border-radius: 999px; margin-bottom: 12px; }
+  pre { background: #f6f8fa; border: 1px solid #d1d9e0; border-radius: 8px; padding: 14px 16px; font: 14px/1.55 Consolas, "JetBrains Mono", monospace; -webkit-user-select: none; user-select: none; overflow: auto; }
+  #late { color: #59636e; font-size: 14.5px; border-top: 1px solid #d1d9e0; padding-top: 12px; }
+</style>
+<script>
+  window.__pageSaw = { contextmenu: 0, contextmenuWindow: 0, selectstart: 0, copy: 0, keydownCopy: 0, mousedown: 0, dragstart: 0 };
+  window.__loadId = Math.random().toString(36).slice(2);
+  window.addEventListener("contextmenu", (e) => { __pageSaw.contextmenuWindow++; e.preventDefault(); }, true);
+  document.addEventListener("contextmenu", (e) => { __pageSaw.contextmenu++; e.preventDefault(); }, true);
+  document.addEventListener("selectstart", (e) => { __pageSaw.selectstart++; e.preventDefault(); });
+  document.addEventListener("dragstart", (e) => { __pageSaw.dragstart++; e.preventDefault(); });
+  document.addEventListener("copy", (e) => {
+    __pageSaw.copy++;
+    e.preventDefault();
+    if (e.clipboardData) e.clipboardData.setData("text/plain", "Copying is not allowed on this site.");
+  });
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && ["c", "x", "a"].includes(e.key.toLowerCase())) { __pageSaw.keydownCopy++; e.preventDefault(); }
+  });
+</script>
+</head>
+<body oncontextmenu="return false" onselectstart="return false" oncopy="return false" ondragstart="return false">
+<header class="site"><i></i>Example Blog</header>
+<main>
+  <div class="notice">Copying is disabled on this page</div>
+  <h1 id="title">Reading config files in Python</h1>
+  <div class="meta">5 min read · configparser · standard library</div>
+  <p id="para">The configparser module reads INI-style files. Create a parser, call read() with the file name, and then look values up by section and key. Missing keys raise KeyError unless you pass a fallback.</p>
+  <pre id="code">import configparser
+
+config = configparser.ConfigParser()
+config.read("settings.ini")
+port = config.getint("server", "port", fallback=8080)</pre>
+  <p id="mdblock" onmousedown="__pageSaw.mousedown++; return false">getint(), getfloat() and getboolean() convert the value for you, so "8080", "0.5" and "yes" come back as 8080, 0.5 and True.</p>
+  <div id="lateWrap"></div>
+</main>
+<script>
+  setTimeout(() => {
+    const p = document.createElement("p");
+    p.id = "late";
+    p.setAttribute("oncopy", "return false");
+    p.style.userSelect = "none";
+    p.textContent = "Related: writing config files back with config.write().";
+    document.getElementById("lateWrap").appendChild(p);
+  }, 1000);
+</script>
+</body>
+</html>

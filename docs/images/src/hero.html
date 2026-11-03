@@ -1,0 +1,109 @@
+<!doctype html>
+<!--
+  README banner: the same demo page without and with Let's Copy. The two screenshots in
+  shots/ are real (screenshots.mjs). Render both themes (#dark picks the dark one) with a
+  Chromium-based browser, e.g.
+    msedge --headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=960,580
+           --default-background-color=00000000 --virtual-time-budget=5000
+           --screenshot=hero-dark.png "file:///…/hero.html#dark"
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Let's Copy banner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f6f8fa; --ink: #1f2328; --muted: #59636e; --line: #d1d9e0; --card: #ffffff;
+    --green: #1a7f37; --red: #cf222e; --violet: #8250df;
+    --shadow: 0 1px 2px rgba(31,35,40,.06), 0 6px 18px rgba(31,35,40,.06);
+    --tint1: rgba(130,80,223,.10); --tint2: rgba(26,127,55,.07);
+  }
+  .dark {
+    --bg: #0d1117; --bg2: #151b23; --ink: #f0f6fc; --muted: #9198a1; --line: #3d444d; --card: #151b23;
+    --green: #3fb950; --red: #f85149; --violet: #ab7df8;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --tint1: rgba(171,125,248,.14); --tint2: rgba(63,185,80,.09);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body { width: 960px; height: 580px; font-family: Inter, "Segoe UI", sans-serif; color: var(--ink); }
+  code { font-family: "JetBrains Mono", Consolas, monospace; font-size: .92em; }
+  .frame { position: relative; width: 960px; height: 580px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
+           background: radial-gradient(560px 300px at 90% 0%, var(--tint1), transparent 70%),
+                       radial-gradient(460px 260px at 0% 100%, var(--tint2), transparent 70%), var(--bg); }
+  .dots { position: absolute; inset: 0; opacity: .5;
+          background-image: radial-gradient(var(--line) 1px, transparent 1.2px); background-size: 22px 22px;
+          -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 40%); }
+
+  header { position: absolute; left: 40px; top: 34px; display: flex; align-items: center; gap: 18px; }
+  .mark { width: 58px; height: 58px; border-radius: 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          display: grid; place-items: center; box-shadow: var(--shadow); }
+  h1 { margin: 0; font-size: 44px; font-weight: 800; letter-spacing: -0.035em; line-height: 1; }
+  .tag { margin: 8px 0 0; font-size: 18px; color: var(--muted); letter-spacing: -0.005em; }
+  .tag b { color: var(--ink); font-weight: 600; }
+  .kbd { position: absolute; right: 40px; top: 50px; display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+  .kbd span { font: 600 12.5px Inter, sans-serif; color: var(--ink); padding: 5px 9px; border-radius: 7px; border: 1px solid var(--line);
+              border-bottom-width: 2px; background: var(--card); }
+
+  .panel { position: absolute; top: 132px; width: 432px; }
+  #before { left: 40px; } #after { right: 40px; }
+  .label { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+           display: flex; align-items: center; gap: 8px; margin: 0 0 10px 2px; }
+  .label i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+  .win { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); background: var(--card); }
+  .bar { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+  .bar s { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+  .bar .url { margin-left: 8px; flex: 1; height: 19px; border-radius: 999px; background: var(--card); border: 1px solid var(--line);
+              font: 500 10.5px "JetBrains Mono", Consolas, monospace; color: var(--muted); display: flex; align-items: center; padding: 0 9px; }
+  .win img { display: block; width: 100%; }
+  ul { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+  li { display: flex; gap: 9px; align-items: baseline; font-size: 13.5px; line-height: 1.4; }
+  li b { font-weight: 600; flex: none; width: 92px; }
+  li span { color: var(--muted); }
+  li::before { flex: none; width: 16px; font-weight: 800; text-align: center; }
+  #before li::before { content: "✕"; color: var(--red); }
+  #after li::before { content: "✓"; color: var(--green); }
+  .arrow { position: absolute; left: 472px; top: 254px; width: 16px; }
+</style>
+</head>
+<body>
+<script>if (location.hash === '#dark') document.documentElement.className = 'dark';</script>
+<div class="frame">
+  <div class="dots"></div>
+  <header>
+    <div class="mark">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Let's Copy</h1>
+      <p class="tag">Select, copy and right-click again on sites that <b>block it</b>.</p>
+    </div>
+  </header>
+  <div class="kbd"><span>Alt</span><span>Shift</span><span>C</span>&nbsp;to toggle a site</div>
+
+  <div class="panel" id="before" style="--c: var(--red)">
+    <div class="label"><i></i>Without Let's Copy</div>
+    <div class="win"><div class="bar"><s></s><s></s><s></s><div class="url">blog.example.com</div></div><img src="shots/page-before.png" alt=""></div>
+    <ul>
+      <li><b>Select text</b><span>dragging highlights nothing</span></li>
+      <li><b>Copy</b><span>the page swaps in "Copying is not allowed"</span></li>
+      <li><b>Right-click</b><span>no menu</span></li>
+    </ul>
+  </div>
+
+  <div class="panel" id="after" style="--c: var(--green)">
+    <div class="label"><i></i>With Let's Copy</div>
+    <div class="win"><div class="bar"><s></s><s></s><s></s><div class="url">blog.example.com</div></div><img src="shots/page-after.png" alt=""></div>
+    <ul>
+      <li><b>Select text</b><span>highlights as usual</span></li>
+      <li><b>Copy</b><span>you get the text you selected</span></li>
+      <li><b>Right-click</b><span>the browser menu (some sites need one reload)</span></li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

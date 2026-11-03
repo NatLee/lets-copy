@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+  "How it works" diagram for the README. Render both themes (#dark picks the dark one) with a
+  Chromium-based browser, e.g.
+    msedge --headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=960,430
+           --default-background-color=00000000 --virtual-time-budget=5000
+           --screenshot=how-it-works-dark.png "file:///…/how-it-works.html#dark"
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How Let's Copy works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff; --bg2: #f6f8fa; --ink: #1f2328; --muted: #59636e; --line: #d1d9e0; --card: #ffffff;
+    --green: #1a7f37; --red: #cf222e; --violet: #8250df; --wire: #8c959f;
+    --shadow: 0 1px 2px rgba(31,35,40,.06), 0 6px 18px rgba(31,35,40,.06); --tint1: rgba(130,80,223,.08);
+  }
+  .dark {
+    --bg: #0d1117; --bg2: #151b23; --ink: #f0f6fc; --muted: #9198a1; --line: #3d444d; --card: #151b23;
+    --green: #3fb950; --red: #f85149; --violet: #ab7df8; --wire: #768390;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35); --tint1: rgba(171,125,248,.12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; }
+  body { width: 960px; height: 430px; font-family: Inter, "Segoe UI", sans-serif; color: var(--ink); }
+  code { font-family: "JetBrains Mono", Consolas, monospace; font-size: .9em; font-variant-ligatures: none; }
+  .frame { position: relative; width: 960px; height: 430px; border-radius: 22px; overflow: hidden; border: 1px solid var(--line);
+           background: radial-gradient(640px 260px at 50% 0%, var(--tint1), transparent 70%), var(--bg); }
+  .label { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+           display: flex; align-items: center; gap: 8px; }
+  .label i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--violet)); }
+  .title { position: absolute; left: 40px; top: 26px; }
+  .sub { position: absolute; left: 40px; top: 46px; font-size: 14px; color: var(--muted); }
+  .sub b { color: var(--ink); font-weight: 600; }
+
+  .step { position: absolute; top: 86px; width: 158px; height: 136px; background: var(--card); border: 1px solid var(--line);
+          border-radius: 14px; box-shadow: var(--shadow); padding: 13px 14px; }
+  .step h3 { margin: 8px 0 0; font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; }
+  .step p { margin: 5px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  .step.us { border-color: color-mix(in srgb, var(--violet) 55%, var(--line)); outline: 3px solid color-mix(in srgb, var(--violet) 18%, transparent); }
+  .step.blocked h3 { text-decoration: line-through; text-decoration-color: var(--red); text-decoration-thickness: 2px; }
+  .step.result { border-color: color-mix(in srgb, var(--green) 50%, var(--line)); }
+  #s1 { left: 40px; } #s2 { left: 222px; } #s3 { left: 404px; } #s4 { left: 586px; } #s5 { left: 768px; width: 152px; }
+  .tagx { position: absolute; top: 230px; font-size: 12px; font-weight: 600; text-align: center; width: 158px; }
+  svg.wires { position: absolute; inset: 0; }
+  .wire { fill: none; stroke: var(--wire); stroke-width: 2; }
+  .wire.dash { stroke-dasharray: 5 6; opacity: .7; }
+  .head { fill: var(--wire); }
+
+  .row { position: absolute; left: 40px; right: 40px; top: 262px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 13px 16px; height: 136px; }
+  .box h4 { margin: 8px 0 0; font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; }
+  .box p { margin: 5px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  .box p code { color: var(--ink); }
+</style>
+</head>
+<body>
+<script>if (location.hash === '#dark') document.documentElement.className = 'dark';</script>
+<div class="frame">
+  <div class="label title"><i></i>How Let's Copy gets there first</div>
+  <div class="sub">A right-click, copy or selection travels from <b>window</b> down to the element. Let's Copy waits at the very top.</div>
+
+  <div class="step" id="s1"><div class="label" style="--c: var(--muted)"><i></i>You</div>
+    <h3>Right-click, copy or select</h3><p>the browser fires an event for it</p></div>
+  <div class="step us" id="s2"><div class="label"><i></i>window</div>
+    <h3>Let's Copy</h3><p>listens first, in the capture phase, and stops the event right here</p></div>
+  <div class="step blocked" id="s3"><div class="label" style="--c: var(--red)"><i></i>document</div>
+    <h3>page's blocker</h3><p>its <code>preventDefault()</code> never gets to run</p></div>
+  <div class="step blocked" id="s4"><div class="label" style="--c: var(--red)"><i></i>element</div>
+    <h3>inline handler</h3><p><code>oncopy="return false"</code> and the like are removed</p></div>
+  <div class="step result" id="s5"><div class="label" style="--c: var(--green)"><i></i>Browser</div>
+    <h3>Does the default</h3><p>menu opens, text copies, selection works</p></div>
+
+  <svg class="wires" width="960" height="430">
+    <path class="wire" d="M198 152 H214"/><path class="head" d="M220 152 l-8 -5 v10 z"/>
+    <path class="wire dash" d="M380 152 H396"/><path class="head" d="M402 152 l-8 -5 v10 z"/>
+    <path class="wire dash" d="M562 152 H578"/><path class="head" d="M584 152 l-8 -5 v10 z"/>
+    <path class="wire" d="M301 222 V244 H845 V230"/><path class="head" d="M845 224 l-5 8 h10 z"/>
+  </svg>
+
+  <div class="row">
+    <div class="box"><div class="label"><i></i>1 · Runs before the page</div>
+      <h4>Injected at <code>document_start</code></h4>
+      <p>Each site you turn on gets a content script in the page's own JavaScript world, before any of the page's scripts run.</p></div>
+    <div class="box"><div class="label"><i></i>2 · Stops the events</div>
+      <h4>Capture-phase listeners on <code>window</code></h4>
+      <p><code>contextmenu</code>, <code>copy</code>, <code>cut</code>, <code>paste</code>, <code>selectstart</code>, <code>dragstart</code> and right-button mouse events.</p></div>
+    <div class="box"><div class="label"><i></i>3 · Cleans up the rest</div>
+      <h4>CSS and inline handlers</h4>
+      <p><code>user-select: auto !important</code> everywhere, and <code>on*</code> blockers removed from existing and newly added elements.</p></div>
+  </div>
+</div>
+</body>
+</html>

@@ -38,8 +38,11 @@ function render(state) {
   const host = state.host;
   if (host) {
     els.hostname.textContent = host;
-    els.favicon.src = state.favicon || `https://www.google.com/s2/favicons?domain=${host}&sz=64`;
+    // Use the icon the browser already has for the tab. Without one, show the
+    // built-in globe rather than asking a favicon service, which would tell
+    // that service which site you're on.
     els.favicon.onerror = () => { els.favicon.src = FALLBACK_FAVICON; };
+    els.favicon.src = state.favicon || FALLBACK_FAVICON;
     els.toggle.checked = !!state.currentEnabled;
     // When Always-on is engaged, the per-site toggle is conceptually pinned —
     // disabling it would only delete from the host list while always-on keeps
@@ -167,13 +170,14 @@ els.clearAll.addEventListener("click", async () => {
   await refresh();
 });
 
-// Hide GitHub link if we don't have a real URL configured.
-document.getElementById("repo-link")?.addEventListener("click", (e) => {
+// GitHub link: the href itself points at the project (manifest
+// homepage_url), so a middle-click or "open in new tab" lands there too.
+const repoLink = document.getElementById("repo-link");
+const homepage = chrome.runtime.getManifest().homepage_url;
+if (homepage) repoLink.href = homepage;
+repoLink.addEventListener("click", (e) => {
   e.preventDefault();
-  // Best-effort — open extension's homepage if defined in the manifest.
-  const manifest = chrome.runtime.getManifest();
-  const url = manifest.homepage_url || "https://github.com/";
-  chrome.tabs.create({ url });
+  chrome.tabs.create({ url: repoLink.href });
 });
 
 refresh();

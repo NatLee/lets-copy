@@ -1,6 +1,6 @@
 # Privacy Policy — Let's Copy
 
-**Effective date:** 2026-05-15
+**Effective date:** 2026-11-03
 
 ## TL;DR
 
@@ -29,27 +29,15 @@ This data:
 | --- | --- |
 | `storage` | Save your per-site preferences locally |
 | `scripting` | Inject the unlock script into pages on your enabled list |
-| `tabs` | Read the active tab's URL to know which site you are on |
-| `host_permissions: <all_urls>` | Required so the unlock script can run on any site you choose to enable |
+| `host_permissions: <all_urls>` | Required so the unlock script can run on any site you choose to enable, and so the popup can see which site the current tab is on |
 
 The extension only injects code into tabs whose hostname matches your enabled list (or every tab, if you turn on **Always on**).
 
 ## Third-party services
 
-The popup displays a site's favicon. If Chrome has not yet supplied a favicon for the active tab, the popup falls back to Google's public favicon service:
+None. The only image the popup loads from outside the extension is the current tab's own icon, from the address the browser already found for that site (usually served from the browser cache, and with `referrerpolicy="no-referrer"`). If the browser has no icon for the tab, the popup shows a built-in globe instead.
 
-```
-https://www.google.com/s2/favicons?domain={hostname}&sz=64
-```
-
-This request:
-
-- Includes only the hostname of the active tab
-- Is sent only when the popup is opened
-- Uses `referrerpolicy="no-referrer"` so the originating URL is not leaked
-- Contains no other information about the user
-
-If you prefer not to contact Google for favicons, disable the extension on sensitive tabs before opening the popup.
+Versions up to 2.1.0 asked Google's public favicon service (`https://www.google.com/s2/favicons?domain={hostname}`) for an icon in that case, which sent it the hostname of the current tab. That request was removed in the version after 2.1.0.
 
 ## Analytics, telemetry, advertising
 
@@ -71,7 +59,7 @@ Questions or concerns: <https://github.com/NatLee/lets-copy/issues>
 
 # 隱私權政策 — Let's Copy
 
-**生效日期：** 2026-05-15
+**生效日期：** 2026-11-03
 
 ## 簡述
 
@@ -100,27 +88,15 @@ Let's Copy 用於解除網站對複製、文字選取、右鍵選單的限制，
 | --- | --- |
 | `storage` | 在本機儲存使用者偏好 |
 | `scripting` | 將解鎖腳本注入至已啟用清單上的頁面 |
-| `tabs` | 讀取當前分頁網址，以辨識所在站台 |
-| `host_permissions: <all_urls>` | 允許在任何使用者選擇啟用的站台上注入腳本 |
+| `host_permissions: <all_urls>` | 允許在任何使用者選擇啟用的站台上注入腳本，並讓 popup 知道目前分頁所在的站台 |
 
 擴充功能只會將腳本注入主機名稱符合已啟用清單的分頁；若開啟 **Always on**，則套用到所有分頁。
 
 ## 第三方服務
 
-Popup 顯示站台 favicon。若 Chrome 尚未為當前分頁提供 favicon，popup 會 fallback 至 Google 的公開 favicon 服務：
+無。Popup 唯一會從擴充功能以外載入的圖片，是當前分頁網站自己的圖示，網址是瀏覽器已經為該網站找到的那一個（通常直接從瀏覽器快取取得，並使用 `referrerpolicy="no-referrer"`）。如果瀏覽器沒有這個分頁的圖示，popup 會改用內建的地球圖示。
 
-```
-https://www.google.com/s2/favicons?domain={hostname}&sz=64
-```
-
-此請求：
-
-- 只包含當前分頁的主機名稱
-- 僅在 popup 開啟時送出
-- 使用 `referrerpolicy="no-referrer"` 避免外洩來源網址
-- 不包含任何其他關於使用者的資訊
-
-若不希望與 Google 服務通訊以取得 favicon，請在開啟 popup 前停用該分頁的擴充功能。
+2.1.0 以前的版本在這種情況下會向 Google 的公開 favicon 服務（`https://www.google.com/s2/favicons?domain={hostname}`）要圖示，請求中會帶有當前分頁的主機名稱。2.1.0 之後的版本已移除這個請求。
 
 ## 分析、遙測、廣告
 

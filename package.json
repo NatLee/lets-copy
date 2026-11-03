@@ -1,0 +1,13 @@
+{
+  "name": "lets-copy",
+  "private": true,
+  "description": "Dev scripts for the Let's Copy browser extension. The extension itself is src/ and has no dependencies.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node scripts/check-extension.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
