@@ -26,9 +26,13 @@ before(async () => {
         args: [`--host-resolver-rules=${Object.values(HOSTS).map((h) => `MAP ${h} 127.0.0.1`).join(", ")}`],
     });
     const id = await browser.loadExtension(ext);
-    worker = await browser.waitForTarget((t) => t.type === "service_worker" && t.url.startsWith(`chrome-extension://${id}/`));
+    worker = await browser.extensionWorker(id);
     page = await browser.newPage();
     await page.send("Emulation.setDeviceMetricsOverride", { width: 900, height: 700, deviceScaleFactor: 1, mobile: false });
+    // Trusted mouse and key events only reach a focused, painted page; a fresh
+    // headless tab can drop the first ones otherwise.
+    await page.send("Page.bringToFront");
+    await page.send("Emulation.setFocusEmulationEnabled", { enabled: true });
 });
 
 after(async () => {
@@ -40,6 +44,7 @@ after(async () => {
 async function open(host) {
     await page.goto(url(host));
     await page.waitFor("document.getElementById('late')", { what: "the demo page" });
+    await page.settle();
 }
 
 /** Run in the extension's service worker, the way the popup and the shortcut do. */
@@ -136,6 +141,7 @@ test("switching the site off reloads it and the blockers come back", TIMEOUT, as
     const loadId = await page.evaluate("__loadId");
     await inWorker("toggleCurrentTab()");
     await page.waitFor(`window.__loadId && window.__loadId !== ${JSON.stringify(loadId)} && document.getElementById('late')`, { what: "the reload" });
+    await page.settle();
     assert.deepEqual(await blockers(), ALL_BLOCKED);
 });
 

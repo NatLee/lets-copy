@@ -28,7 +28,7 @@ const browser = await launchBrowser({
 });
 try {
     const id = await browser.loadExtension(ext);
-    const worker = await browser.waitForTarget((t) => t.type === "service_worker" && t.url.startsWith(`chrome-extension://${id}/`));
+    const worker = await browser.extensionWorker(id);
     const page = await browser.newPage();
     await page.send("Emulation.setDeviceMetricsOverride", { ...PAGE_SIZE, deviceScaleFactor: 1, mobile: false });
     const save = async (file, png) => { writeFileSync(file, png); console.log(path.relative(root, file)); };

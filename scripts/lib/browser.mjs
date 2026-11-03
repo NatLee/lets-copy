@@ -133,6 +133,15 @@ export async function launchBrowser({ browser = findBrowser(), args = [] } = {})
             if (url !== "about:blank") await page.goto(url);
             return page;
         },
+        /**
+         * Attach to an extension's service worker once its code runs. The target
+         * shows up before the worker has started, when chrome.* is still missing.
+         */
+        async extensionWorker(id) {
+            const worker = await this.waitForTarget((t) => t.type === "service_worker" && t.url.startsWith(`chrome-extension://${id}/`));
+            await worker.waitFor("typeof chrome === 'object' && !!chrome.runtime?.id", { what: "the service worker to start" });
+            return worker;
+        },
         /** Attach to the first target matching `predicate` once it exists. */
         async waitForTarget(predicate, { timeout = WAIT_TIMEOUT_MS } = {}) {
             const deadline = Date.now() + timeout;
