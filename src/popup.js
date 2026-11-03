@@ -170,13 +170,14 @@ els.clearAll.addEventListener("click", async () => {
   await refresh();
 });
 
-// Hide GitHub link if we don't have a real URL configured.
-document.getElementById("repo-link")?.addEventListener("click", (e) => {
+// GitHub link: the href itself points at the project (manifest
+// homepage_url), so a middle-click or "open in new tab" lands there too.
+const repoLink = document.getElementById("repo-link");
+const homepage = chrome.runtime.getManifest().homepage_url;
+if (homepage) repoLink.href = homepage;
+repoLink.addEventListener("click", (e) => {
   e.preventDefault();
-  // Best-effort — open extension's homepage if defined in the manifest.
-  const manifest = chrome.runtime.getManifest();
-  const url = manifest.homepage_url || "https://github.com/";
-  chrome.tabs.create({ url });
+  chrome.tabs.create({ url: repoLink.href });
 });
 
 refresh();
