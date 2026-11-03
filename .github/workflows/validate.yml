@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
       # Background service worker against a fake chrome.* API (test/fake-chrome.js),
       # plus tests for the checker below.
