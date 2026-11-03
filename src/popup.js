@@ -44,10 +44,9 @@ function render(state) {
     els.favicon.onerror = () => { els.favicon.src = FALLBACK_FAVICON; };
     els.favicon.src = state.favicon || FALLBACK_FAVICON;
     els.toggle.checked = !!state.currentEnabled;
-    // When Always-on is engaged, the per-site toggle is conceptually pinned —
-    // disabling it would only delete from the host list while always-on keeps
-    // unlocking. Lock the control and explain why.
-    els.toggle.disabled = !!state.alwaysOn;
+    // The worker decides whether this site's switch can be used (not while
+    // Always on is set); the popup only shows it and says why.
+    els.toggle.disabled = !state.canToggle;
     els.toggle.title = state.alwaysOn ? "Turn off Always-on to manage this site individually" : "Toggle for this site";
     if (state.currentEnabled) {
       els.hero.dataset.state = "on";

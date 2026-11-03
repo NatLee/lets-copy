@@ -48,6 +48,7 @@ test("getState describes the current tab for the popup", async () => {
         alwaysOn: false,
         currentEnabled: true,
         injectable: true,
+        canToggle: true,
     });
 });
 
@@ -57,6 +58,7 @@ test("pages that aren't http(s) can't be switched on", async () => {
     const state = await bg.send({ type: "getState" });
     assert.equal(state.host, null);
     assert.equal(state.injectable, false);
+    assert.equal(state.canToggle, false);
 
     await bg.send({ type: "toggleCurrent" });
     assert.equal(bg.storage.enabledHosts, undefined);
@@ -87,6 +89,16 @@ test("the keyboard shortcut does nothing while Always on is set", async () => {
     assert.deepEqual(bg.log.reload, []);
     assert.deepEqual(bg.storage.enabledHosts, []);
     assert.deepEqual(bg.matches(), ["<all_urls>"]);
+    // ...and the popup is told the same, from the same rule.
+    assert.equal((await bg.send({ type: "getState" })).canToggle, false);
+});
+
+test("only http and https pages can be switched on", async () => {
+    for (const url of ["file:///C:/notes.html", "ftp://example.com/", "chrome-extension://abc/popup.html", "about:blank"]) {
+        const bg = loadBackground({ tabs: [{ id: 3, url, active: true }] });
+        await bg.ready();
+        assert.equal((await bg.send({ type: "getState" })).canToggle, false, url);
+    }
 });
 
 test("the keyboard shortcut toggles the current site", async () => {

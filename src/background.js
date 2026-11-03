@@ -17,6 +17,8 @@ const DYNAMIC_SCRIPT_ID = "letscopy-autoinject";
 const MANIFEST = chrome.runtime.getManifest();
 const TOOLBAR_ICONS = { on: MANIFEST.icons, off: MANIFEST.action.default_icon };
 const BADGE = { text: "ON", color: "#10b981" };
+// Pages Let's Copy can work on: the schemes the "*://host/*" match patterns cover.
+const UNLOCKABLE_PROTOCOLS = new Set(["http:", "https:"]);
 
 const state = {
   enabledHosts: new Set(),
@@ -40,7 +42,7 @@ async function saveState() {
 function hostOf(url) {
   try {
     const u = new URL(url);
-    return u.protocol.startsWith("http") ? u.hostname : null;
+    return UNLOCKABLE_PROTOCOLS.has(u.protocol) ? u.hostname : null;
   } catch {
     return null;
   }
@@ -48,6 +50,13 @@ function hostOf(url) {
 
 function isEnabledFor(host) {
   return !!host && (state.alwaysOn || state.enabledHosts.has(host));
+}
+
+// Whether the per-site switch (popup) and the shortcut can change this site.
+// Not while Always on is set: it has no per-site exceptions, so "switching a
+// site off" would only reload the page and leave it unlocked.
+function canToggle(host) {
+  return !!host && !state.alwaysOn;
 }
 
 async function syncDynamicScripts() {
@@ -122,15 +131,9 @@ async function getActiveTab() {
 }
 
 async function toggleCurrentTab() {
-  // Always on has no per-site exceptions, so there is nothing to switch here.
-  // The popup greys its switch out; the shortcut used to "switch off" a host
-  // that was never in the list, which just reloaded the page (losing any
-  // unsaved input) and left it unlocked.
-  if (state.alwaysOn) return;
   const tab = await getActiveTab();
-  if (!tab) return;
-  const host = hostOf(tab.url);
-  if (!host) return;
+  const host = tab ? hostOf(tab.url) : null;
+  if (!canToggle(host)) return;
   if (isEnabledFor(host)) {
     await disableHost(host);
     await chrome.tabs.reload(tab.id);
@@ -184,6 +187,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           alwaysOn: state.alwaysOn,
           currentEnabled: isEnabledFor(host),
           injectable: !!host,
+          canToggle: canToggle(host),
         });
         break;
       }
