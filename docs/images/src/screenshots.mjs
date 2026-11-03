@@ -58,17 +58,20 @@ try {
 
     // The popup page in a background tab of the same window: the demo page stays the active
     // tab, so the popup shows its real state. (chrome.action.openPopup() works headless too,
-    // but its window is too short to capture whole.)
-    const popup = await browser.newPage({ url: `chrome-extension://${id}/popup.html`, background: true });
-    await popup.waitFor(`document.getElementById('hostname').textContent === ${JSON.stringify(SITE)} && document.querySelectorAll('.site-item').length === ${ALREADY_ON.length + 1}`, { what: "the popup to show the demo site" });
+    // but its window is too short to capture whole.) One fresh tab per colour scheme, set
+    // before the page loads, so no theme transition is caught half-way.
     for (const scheme of SCHEMES) {
+        const popup = await browser.newPage({ background: true });
         await popup.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
+        await popup.goto(`chrome-extension://${id}/popup.html`);
+        await popup.waitFor(`document.getElementById('hostname').textContent === ${JSON.stringify(SITE)} && document.querySelectorAll('.site-item').length === ${ALREADY_ON.length + 1}`, { what: "the popup to show the demo site" });
         // The popup's width comes from its CSS; the height from its content.
         const size = await popup.evaluate("({ width: Math.ceil(document.body.getBoundingClientRect().width), height: Math.ceil(document.querySelector('.app').getBoundingClientRect().bottom) })");
         await popup.send("Emulation.setDeviceMetricsOverride", { ...size, deviceScaleFactor: POPUP_SCALE, mobile: false });
         // No settle() here: a background tab runs no animation frames. The screenshot
         // itself lays out and paints the page.
         await save(path.join(root, "docs", "images", `popup-${scheme}.png`), await popup.screenshot());
+        await popup.close();
     }
 } finally {
     await browser.close();

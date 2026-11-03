@@ -51,10 +51,15 @@ Click the Let's Copy button in the toolbar (pin it from the puzzle-piece menu if
 - **Reload** appears while a site is on. A few sites install their blockers before Let's Copy can get
   in front of them. On those, right-click starts working after one reload, and from then on every
   visit is unlocked from the start.
+- **Unblock Ctrl+C / ⌘C** appears while a site is on, and is off by default. Switch it on for sites
+  that cancel the copy shortcut itself: the page then never sees Ctrl+C (⌘C on a Mac), so the browser
+  copies as usual. It's per site, because web apps with their own Ctrl+C (editors, spreadsheets) need
+  to see it. It takes effect straight away, without a reload.
 - **Always on** unlocks every site you visit. While it's on, the per-site switch and the shortcut do
   nothing, because there is nothing to switch.
-- **Active sites** lists the sites you've turned on. Hover over one and click × to remove it. *Clear
-  all* asks for a second click, then forgets every site and turns Always on off.
+- **Active sites** lists the sites you've turned on. Hover over one and click × to remove it (that
+  also forgets its Ctrl+C setting). *Clear all* asks for a second click, then forgets every site and
+  every setting, and turns Always on off.
 
 ## How it works
 
@@ -75,7 +80,8 @@ them. Let's Copy deals with all three ([`src/enable.js`](src/enable.js)):
 2. The script listens for `contextmenu`, `selectstart`, `copy`, `cut`, `paste`, `dragstart` (and the
    right mouse button) on `window`, in the capture phase. That is the first stop of every event, so it
    can stop the event before any of the page's listeners see it. The browser then does what it
-   normally does: shows the menu, copies the text, starts the selection.
+   normally does: shows the menu, copies the text, starts the selection. On sites where you switch on
+   *Unblock Ctrl+C / ⌘C*, the copy shortcut's `keydown` is one more event on that list.
 3. It adds a stylesheet that sets `user-select: auto !important` on everything. It also removes inline
    blockers (`oncontextmenu`, `oncopy`, `onselectstart`, `onmousedown`, `unselectable`, …), including on
    elements the page adds later.
@@ -87,15 +93,16 @@ On csdn.net it also switches on `designMode`, which makes CSDN's code blocks sel
 - **The page's own copy and paste handling is skipped too.** While a site is on, its `copy`, `cut` and
   `paste` listeners never run, including useful ones such as pasting an image into a chat box. If a web
   app misbehaves, turn Let's Copy off for that site, or turn off Always on.
-- **Ctrl+C blocked on the keyboard isn't undone.** Some sites cancel the `Ctrl+C` key press itself. On
-  those, select the text and use **Copy** from the right-click menu.
+- **Ctrl+C blocked on the keyboard needs the extra switch.** Some sites cancel the `Ctrl+C` key press
+  itself. Switch on *Unblock Ctrl+C / ⌘C* for those sites, or use **Copy** from the right-click menu.
+  While the switch is on, the site's own Ctrl+C handling doesn't run either.
 - **Turning a site off reloads it.** The unlock can't be undone in a page that's already open.
 
 ## Permissions
 
 | Permission | What it is for |
 |---|---|
-| `storage` | Remembers the sites you turned on and whether Always on is set, in your browser profile. |
+| `storage` | Remembers the sites you turned on, where Ctrl+C is unblocked, and whether Always on is set, in your browser profile. |
 | `scripting` | Runs the unlock script on the sites you turned on. |
 | Access to all websites (`<all_urls>`) | Lets the unlock script run on whichever site you pick, and lets the popup show which site the current tab is on. |
 
