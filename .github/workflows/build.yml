@@ -39,12 +39,10 @@ jobs:
             exit 1
           fi
 
-      - name: Validate manifest and lint scripts
+      - name: Unit tests and extension check
         run: |
-          node -e "JSON.parse(require('fs').readFileSync('src/manifest.json','utf8'))"
-          node --check src/background.js
-          node --check src/enable.js
-          node --check src/popup.js
+          npm test
+          npm run check
 
       - name: Build zip
         id: zip

@@ -3,64 +3,33 @@ name: Validate
 on:
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - '.github/workflows/**'
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   lint:
-    name: Manifest + JS syntax
+    name: Unit tests + extension check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
-      - name: Validate manifest.json
-        run: node -e "JSON.parse(require('fs').readFileSync('src/manifest.json','utf8'))"
+      # Background service worker against a fake chrome.* API (test/fake-chrome.js),
+      # plus tests for the checker below.
+      - name: Unit tests
+        run: npm test
 
-      - name: Check JS syntax
-        run: |
-          node --check src/background.js
-          node --check src/enable.js
-          node --check src/popup.js
-
-      - name: Verify required files exist
-        run: |
-          set -e
-          required_files=(
-            src/manifest.json
-            src/background.js
-            src/enable.js
-            src/popup.html
-            src/popup.css
-            src/popup.js
-          )
-          for f in "${required_files[@]}"; do
-            [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
-          done
-
-      - name: Verify icons referenced in manifest exist
-        run: |
-          set -e
-          required_icons=(
-            icons/icon24.png
-            icons/icon32.png
-            icons/icon128.png
-            icons/icon24-disable.png
-            icons/icon32-disable.png
-            icons/icon128-disable.png
-          )
-          for f in "${required_icons[@]}"; do
-            [ -f "src/$f" ] || { echo "::error::Missing src/$f"; exit 1; }
-          done
+      # Manifest V3 sanity, every referenced file and icon exists, no inline or
+      # remote scripts, JS syntax, permissions on the allowlist.
+      - name: Manifest and file check
+        run: npm run check
 
       - name: Check manifest version is bumped vs main (PR only)
         if: github.event_name == 'pull_request'
