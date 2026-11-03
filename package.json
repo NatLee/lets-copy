@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
+    "test:e2e": "node --test test/e2e/*.e2e.js",
     "check": "node scripts/check-extension.js",
     "demo": "node scripts/demo-server.mjs"
   },
