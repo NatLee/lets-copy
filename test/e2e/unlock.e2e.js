@@ -71,16 +71,20 @@ async function dragSelect(selector) {
     return n;
 }
 
-/** A real right-click; true when one of the page's contextmenu blockers saw it. */
+/**
+ * A real right-click. Returns which of the page's blockers saw it: its
+ * contextmenu listeners, and its right-button mousedown listener.
+ */
 async function rightClickReachesPage(selector) {
     const r = await box(selector);
-    const seen = "__pageSaw.contextmenu + __pageSaw.contextmenuWindow";
-    const before = await page.evaluate(seen);
+    const counts = "[__pageSaw.contextmenu + __pageSaw.contextmenuWindow, __pageSaw.rightMousedown]";
+    const [menuBefore, pressBefore] = await page.evaluate(counts);
     // Input.dispatchMouseEvent returns once the browser has handled the event,
     // contextmenu included (it fires on press or release depending on the OS).
     await mouse("mousePressed", r.x + 10, r.y + 5, "right", 2);
     await mouse("mouseReleased", r.x + 10, r.y + 5, "right", 0);
-    return (await page.evaluate(seen)) > before;
+    const [menu, press] = await page.evaluate(counts);
+    return { rightClick: menu > menuBefore, rightButton: press > pressBefore };
 }
 
 /** A real Ctrl+C key press; true when the page's keydown blocker saw it. */
@@ -96,7 +100,7 @@ async function ctrlCReachesPage() {
 async function blockers() {
     return {
         selection: (await dragSelect("#para")) === 0,
-        rightClick: await rightClickReachesPage("#para"),
+        ...(await rightClickReachesPage("#para")),
         copyKey: await ctrlCReachesPage(),
         ...(await page.evaluate(`(() => {
             const para = document.getElementById("para");
@@ -114,8 +118,8 @@ async function blockers() {
     };
 }
 
-const ALL_BLOCKED = { selection: true, rightClick: true, copyKey: true, css: true, copy: true, selectstart: true, dragstart: true, inline: true, lateParagraph: true };
-const UNLOCKED = { ...ALL_BLOCKED, selection: false, rightClick: false, css: false, copy: false, selectstart: false, dragstart: false, inline: false, lateParagraph: false };
+const ALL_BLOCKED = { selection: true, rightClick: true, rightButton: true, copyKey: true, css: true, copy: true, selectstart: true, dragstart: true, inline: true, lateParagraph: true };
+const UNLOCKED = { ...ALL_BLOCKED, selection: false, rightClick: false, rightButton: false, css: false, copy: false, selectstart: false, dragstart: false, inline: false, lateParagraph: false };
 
 test("without Let's Copy, the demo page blocks everything", TIMEOUT, async () => {
     await setStorage({ enabledHosts: [], alwaysOn: false });

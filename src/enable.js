@@ -18,20 +18,25 @@
   if (window.__letsCopyActive) return;
   window.__letsCopyActive = true;
 
-  // Events we swallow in capture phase. `selectionchange` is intentionally
-  // omitted: it fires AFTER selection happens and isn't preventable, so
-  // stopping it would only break legitimate text-selection UI without
-  // protecting anything.
-  const BLOCKED_EVENTS = [
-    "contextmenu",
-    "selectstart",
-    "copy",
-    "cut",
-    "paste",
-    "beforecopy",
-    "beforecut",
-    "beforepaste",
-    "dragstart",
+  // What the page's own handlers must not see. Each rule names an event type
+  // and, optionally, `when` (only some of those events). `selectionchange` is
+  // intentionally absent: it fires AFTER selection happens and isn't
+  // preventable, so stopping it would only break legitimate selection UI.
+  const isRightButton = (e) => e.button === 2;
+  const RULES = [
+    { type: "contextmenu" },
+    { type: "selectstart" },
+    { type: "copy" },
+    { type: "cut" },
+    { type: "paste" },
+    { type: "beforecopy" },
+    { type: "beforecut" },
+    { type: "beforepaste" },
+    { type: "dragstart" },
+    // Some pages cancel the right button's mousedown/mouseup to suppress the
+    // menu. Only the right button, so left-click selection still reaches them.
+    { type: "mousedown", when: isRightButton },
+    { type: "mouseup", when: isRightButton },
   ];
 
   const INLINE_ATTRS = [
@@ -50,24 +55,18 @@
     "unselectable",
   ];
 
-  // 1. Capture-phase blocker — stops any other listener (page-level or element-
-  //    level) from receiving these events. We run at document_start, so we
-  //    register before the page does.
-  const swallow = (e) => {
-    e.stopImmediatePropagation();
-  };
-  for (const evt of BLOCKED_EVENTS) {
-    window.addEventListener(evt, swallow, { capture: true });
-    document.addEventListener(evt, swallow, { capture: true });
+  // 1. Capture-phase blocker on window, the first stop of every event: it keeps
+  //    every other listener (page-level or element-level) from receiving the
+  //    event. We run at document_start, so we register before the page does.
+  const rulesByType = new Map();
+  for (const rule of RULES) {
+    if (!rulesByType.has(rule.type)) rulesByType.set(rule.type, []);
+    rulesByType.get(rule.type).push(rule);
   }
-
-  // Right-click via mousedown(button=2) is sometimes used to suppress menus.
-  // Only neutralise the right-button case so left-click selection still works.
-  const rightClickSwallow = (e) => {
-    if (e.button === 2) e.stopImmediatePropagation();
+  const swallow = (e) => {
+    if (rulesByType.get(e.type).some((rule) => !rule.when || rule.when(e))) e.stopImmediatePropagation();
   };
-  window.addEventListener("mousedown", rightClickSwallow, { capture: true });
-  window.addEventListener("mouseup", rightClickSwallow, { capture: true });
+  for (const type of rulesByType.keys()) window.addEventListener(type, swallow, { capture: true });
 
   // 2. Strip inline handlers on existing and future elements.
   const clearOn = (el) => {
