@@ -98,6 +98,8 @@ export function loadBackground({ stored = {}, tabs } = {}) {
             new Promise((resolve) => {
                 listeners.message[0](msg, { id: "test" }, (r) => resolve(clone(r)));
             }),
+        /** Fire chrome.runtime.onInstalled and onStartup together, as a browser start can. */
+        startup: () => Promise.all([...listeners.installed, ...listeners.startup].map((fn) => fn())),
         /** Fire a keyboard command (chrome.commands). */
         command: (name) => Promise.all(listeners.command.map((fn) => fn(name))),
         /** Fire chrome.tabs.onUpdated. */

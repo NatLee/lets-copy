@@ -9,7 +9,10 @@
 //   - Keep the toolbar icon/badge in sync with the current tab's state.
 
 const STORAGE_KEYS = { hosts: "enabledHosts", alwaysOn: "alwaysOn" };
+// Every content script this worker registers has an ID starting with this.
 const DYNAMIC_SCRIPT_ID = "letscopy-autoinject";
+// The page-side unlock, injected in the page's own JavaScript world.
+const UNLOCK_SCRIPT = "enable.js";
 
 // Toolbar look per state. The icons come from the manifest: the extension's
 // own icons (check mark) mean "on", the action's default icons (the greyed
@@ -59,38 +62,45 @@ function canToggle(host) {
   return !!host && !state.alwaysOn;
 }
 
-async function syncDynamicScripts() {
-  // Remove the previous registration (ignore "not found" errors).
-  try {
-    await chrome.scripting.unregisterContentScripts({ ids: [DYNAMIC_SCRIPT_ID] });
-  } catch {}
+const matchPattern = (host) => `*://${host}/*`;
 
-  const matches = state.alwaysOn
-    ? ["<all_urls>"]
-    : [...state.enabledHosts].map(h => `*://${h}/*`);
+// The content scripts that should be registered for the current state: they
+// run at document_start, before the page's own scripts.
+function wantedScripts() {
+  const matches = state.alwaysOn ? ["<all_urls>"] : [...state.enabledHosts].map(matchPattern);
+  if (matches.length === 0) return [];
+  return [{
+    id: DYNAMIC_SCRIPT_ID,
+    matches,
+    js: [UNLOCK_SCRIPT],
+    runAt: "document_start",
+    world: "MAIN",
+    allFrames: true,
+    persistAcrossSessions: true,
+  }];
+}
 
-  if (matches.length === 0) return;
-
-  try {
-    await chrome.scripting.registerContentScripts([{
-      id: DYNAMIC_SCRIPT_ID,
-      matches,
-      js: ["enable.js"],
-      runAt: "document_start",
-      world: "MAIN",
-      allFrames: true,
-      persistAcrossSessions: true,
-    }]);
-  } catch (err) {
-    console.warn("[Let's Copy] registerContentScripts failed:", err);
-  }
+// Replace our registrations with wantedScripts(). Calls are queued: the worker
+// can load its state from several events at once (start-up, install), and two
+// overlapping syncs would register the same ID twice.
+let syncQueue = Promise.resolve();
+function syncDynamicScripts() {
+  syncQueue = syncQueue.then(async () => {
+    const ours = (await chrome.scripting.getRegisteredContentScripts())
+      .map((s) => s.id)
+      .filter((id) => id.startsWith(DYNAMIC_SCRIPT_ID));
+    if (ours.length) await chrome.scripting.unregisterContentScripts({ ids: ours });
+    const wanted = wantedScripts();
+    if (wanted.length) await chrome.scripting.registerContentScripts(wanted);
+  }).catch((err) => console.warn("[Let's Copy] could not update the content scripts:", err));
+  return syncQueue;
 }
 
 async function injectNow(tabId) {
   try {
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
-      files: ["enable.js"],
+      files: [UNLOCK_SCRIPT],
       world: "MAIN",
       injectImmediately: true,
     });

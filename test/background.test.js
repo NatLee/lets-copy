@@ -118,6 +118,16 @@ test("saved sites come back when the service worker restarts", async () => {
     assert.deepEqual(bg.log.warnings, []);
 });
 
+// Before: each sync unregistered inside an empty catch and then registered,
+// so overlapping syncs could both register the same ID.
+test("overlapping start-up syncs leave exactly one registration and no errors", async () => {
+    const bg = loadBackground({ stored: { enabledHosts: ["a.example"], alwaysOn: false } });
+    await Promise.all([bg.ready(), bg.startup(), bg.startup()]);
+    assert.equal(bg.registered.size, 1);
+    assert.deepEqual(bg.matches(), ["*://a.example/*"]);
+    assert.deepEqual(bg.log.warnings, []);
+});
+
 test("removing a site from the list stops it from being unlocked", async () => {
     const bg = loadBackground({ stored: { enabledHosts: ["a.example", "example.com"] } });
     await bg.ready();
